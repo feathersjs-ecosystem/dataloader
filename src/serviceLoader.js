@@ -41,8 +41,13 @@ const createDataLoader = ({
 }
 
 module.exports = class ServiceLoader {
-  constructor({ service, name, ...options }) {
-    const { cacheParamsFn, cacheMap, ...loaderOptions } = options;
+  constructor({
+    service,
+    name,
+    cacheParamsFn,
+    cacheMap,
+    ...loaderOptions
+  }) {
     this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
     this.options = {
@@ -189,8 +194,10 @@ module.exports = class ServiceLoader {
   }
 
   stringifyKey(options, cacheParamsFn = this.options.cacheParamsFn) {
-    const { params, ...rest } = options;
-    return stableStringify({ params: cacheParamsFn(params), ...rest })
+    return stableStringify({
+      ...options,
+      params: cacheParamsFn(options.params)
+    })
   }
 
   clear() {
