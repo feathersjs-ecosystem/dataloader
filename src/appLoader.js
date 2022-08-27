@@ -1,6 +1,11 @@
 const BaseServiceLoader = require('./serviceLoader')
 module.exports = class AppLoader {
-  constructor({ app, services = {}, ServiceLoader = BaseServiceLoader, ...loaderOptions }) {
+  constructor({
+    app,
+    services = {},
+    ServiceLoader = BaseServiceLoader,
+    ...loaderOptions
+  }) {
     this.options = { app, services, loaderOptions, ServiceLoader }
     this.loaders = new Map()
   }

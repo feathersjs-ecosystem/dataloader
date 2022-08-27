@@ -55,10 +55,7 @@ describe('serviceLoader.test', () => {
     const serviceLoader = new ServiceLoader({
       service: app.service('posts')
     })
-    const defaultResult = await Promise.all([
-      app.service('posts').get(1),
-      app.service('posts').get(2)
-    ])
+    const defaultResult = await Promise.all([app.service('posts').get(1), app.service('posts').get(2)])
     const result = await serviceLoader.load([1, 2])
     assert.deepEqual(result, defaultResult)
   })
@@ -86,7 +83,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await Promise.all([
       app.service('comments').find({ paginate: false, query: { postId: 1 } }),
-      app.service('comments').find({ paginate: false, query: { postId: 2 } }),
+      app.service('comments').find({ paginate: false, query: { postId: 2 } })
     ])
     const result = await serviceLoader.multi('postId').load([1, 2])
     assert.deepEqual(result, defaultResult)
@@ -115,18 +112,20 @@ describe('serviceLoader.test', () => {
       service: app.service('posts')
     })
     const methods = ['_get', '_find', '_load']
-    let hookCalled = false;
+    let hookCalled = false
     const hookCallback = (context) => {
       console.log('hookCallback called')
       hookCalled = true
       return context
     }
-    await Promise.all(methods.map((method) => {
-      if (method === '_find') {
-        return serviceLoader[method]({ callback: hookCallback })
-      }
-      return serviceLoader[method](1, { callback: hookCallback })
-    }))
+    await Promise.all(
+      methods.map((method) => {
+        if (method === '_find') {
+          return serviceLoader[method]({ callback: hookCallback })
+        }
+        return serviceLoader[method](1, { callback: hookCallback })
+      })
+    )
     assert.deepEqual(hookCalled, false)
   })
 
@@ -134,8 +133,8 @@ describe('serviceLoader.test', () => {
     const serviceLoader = new ServiceLoader({
       service: app.service('posts')
     })
-    const cacheKey = serviceLoader.stringifyKey({ id: 1, key: 'id' });
-    const stableKey = stableStringify({ key: 'id', id: 1 });
+    const cacheKey = serviceLoader.stringifyKey({ id: 1, key: 'id' })
+    const stableKey = stableStringify({ key: 'id', id: 1 })
     assert.deepEqual(cacheKey, stableKey)
   })
 

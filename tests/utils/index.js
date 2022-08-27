@@ -39,7 +39,7 @@ function makeApp() {
     if (context.params.callback) {
       await context.params.callback(context)
     }
-    return context;
+    return context
   }
 
   app.hooks({
