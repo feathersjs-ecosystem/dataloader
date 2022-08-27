@@ -13,8 +13,8 @@ const loader = new AppLoader({ app });
 // Load one user with id 1
 const user = await loader.service('users').load(1, params);
 
-// Load one user with username "DaddyWarbucks"
-const user = await loader.service('users').key('username').load('DaddyWarbucks', params);
+// Load one user with username "FeathersUser"
+const user = await loader.service('users').key('username').load('FeathersUser', params);
 
 // Load one user per userId in the array
 const users = loader.service('users').load([1, 2, 3], params);
@@ -31,6 +31,11 @@ const comments = await loader.service('comments').multi('userId').load([1, 2, 3]
 // "relationships" but can still benefit from caching the results.
 const user = await loader.service('users').get(1);
 const users = await loader.service('users').find({ query: { status: 'active' } });
+
+// Similarly you can call underscored methods if the service allows it
+const user = await loader.service('users')._get(1);
+const user = await loader.service('users')._load(1);
+const users = await loader.service('users')._find({ query: { status: 'active' } });
 ```
 
 Loaders are most commonly used when resolving data onto results. This is generally done in hooks like `@feathers-/schema`, `withResult`, or `fastJoin`. Setup a loader in before hooks to make it available to these other hooks.
@@ -46,7 +51,6 @@ const initializeLoader = context => {
   if (context.params.loader) {
     return context;
   }
-
   context.params.loader = new AppLoader({ app: context.app });
   return context;
 }
@@ -90,10 +94,14 @@ const user = await serviceLoader.load(1, params);
 const user = await serviceLoader.get(1, params);
 const users = await serviceLoader.find(params);
 
-serviceLoader.clearAll();
+const user = await serviceLoader._load(1, params);
+const user = await serviceLoader._get(1, params);
+const users = await serviceLoader._find(params);
+
+serviceLoader.clear();
 ```
 
-The `ServiceLoader` configures a `DataLoader` with some basic options. The `DataLoader` is a powerful batching and caching class that dramatically imporoves performance. It is based on the [facebook/dataloader](https://github.com/facebook/dataloader). If you are interested in how this works in depth, check out this [GREAT VIDEO](https://www.youtube.com/watch?v=OQTnXNCDywA) by its original author. You should also checkout the [GUIDE](./guide.md) for a comprehensive explanation of how the `DataLoader` works.
+The `ServiceLoader` configures a `DataLoader` with some basic options. The `DataLoader` is a powerful batching and caching class that dramatically imporoves performance. It is based on the [facebook/dataloader](https://github.com/facebook/dataloader). If you are interested in how this works in depth, check out this [GREAT VIDEO](https://www.youtube.com/watch?v=OQTnXNCDywA) by its original author.
 
 
 ```js
@@ -117,12 +125,14 @@ Create a new app-loader. This is the most commonly used class.
   - `{Object} [ options ]`
     - `{Object} app`
     - `{Object} services`
+    - `{Class} ServiceLoader`
     - ...globalLoaderOptions
 
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
 | `app`           | `Object`   |            | A feathers app                                   |
 | `services`      |  `Object`  | `{}`| An object where each property is a service name and the value is loader options for that service. These options override the `globalLoaderOptions` |
+| `ServiceLoader`      |  `Class`  | `ServiceLoader`| A base class that will be used to create each ServiceLoader instance |
 | `globalLoaderOptions`           | `Object`   |      {}      | Options that will be assigned to every new `ServiceLoader`                                |
 
 ```js
@@ -139,7 +149,7 @@ Create a new app-loader. This is the most commonly used class.
   const loader = appLoader.service('users');
 
   const user = await loader.load(1, params);
-  const user = await loader.key('username').load('DaddyWarbucks', params);
+  const user = await loader.key('username').load('FeathersUser', params);
   const users = await loader.load([1, 2, 3], params);
 
   const authorUsers = await loader.multi('role').load('author', params);
@@ -148,7 +158,7 @@ Create a new app-loader. This is the most commonly used class.
   const user = await loader.get(1, params);
   const users = await loader.find(params);
 
-  loader.clearAll()
+  loader.clear()
 ```
 
 <!--- class ServiceLoader --------------------------------------------------------------------------->
@@ -159,12 +169,16 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 - **Arguments:**
   - `{Object} [ options ]`
     - `{Object} service`
+    - `{Map} cacheMap`
+    - `{Map} cacheParamsFn`
     - ...loaderOptions
 
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
 | `service`           | `Object`   |            | A service for this loader. For example, `app.service('users')`                                   |
-| `loaderOptions`           | `Object`   |      {}      | See `DataLoader`, `FindLoader` and `GetLoader`                               |
+| `cacheMap`           | `Map`   |            | A Map like object with methods get, set, and clear to serve as the cache of results.`                                   |
+| `cacheParamsFn`           | `Function`   |      defaultCacheParamsFn      | A function that returns a JSON stringifiable set or params to be used in the cacheKey. The default function traverses the params and removes any functions`                                   |
+| `loaderOptions`           | `Object`   |      {}      | See `DataLoader`                           |
 
 
 ```js
@@ -172,11 +186,17 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 
   const loader = new ServiceLoader({
     service: app.service('users'),
-    ...loaderOptions // See DataLoader and FindLoader
+    cacheParamsFn: (params) => {
+      return {
+        userId: params.user.id,
+        query: params.query
+      }
+    },
+    maxBatchSize: 500 // see DataLoader
   });
 
   const user = await loader.load(1, params);
-  const user = await loader.key('username').load('DaddyWarbucks', params);
+  const user = await loader.key('username').load('FeathersUser', params);
   const users = await loader.load([1, 2, 3], params);
 
   const authorUsers = await loader.multi('role').load('author', params);
@@ -185,91 +205,12 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
   const user = await loader.get(1, params);
   const users = await loader.find(params);
 
-  loader.clearAll()
+  const user = await loader._get(1, params);
+  const users = await loader._find(params);
+  const user = await loader._load(1,params);
+
+  loader.clear()
 ```
-
-<!--- class FindLoader --------------------------------------------------------------------------->
-<h2 id="class-findloader">class FindLoader( [, options] )</h2>
-
-Create a new FindLoader. Create a loader that caches `find()` queries based on their params. FindLoaders are used by ServiceLoaders when calling `find(params)`.
-
-- **Arguments:**
-  - `{Object} [ options ]`
-    - `{Object} service`
-    - `{Object} cacheMap`
-    - `{Function} cacheParamsFn`
-    - `{Function} cacheKeyFn`
-
-| Argument        |    Type    |   Default  | Description                                      |
-| --------------- | :--------: | ---------- | ------------------------------------------------ |
-| `service`           | `Object`   |            | A service for this loader. For example, `app.service('users')`                                   |
-| `cacheMap`      |  `Object`  | `new Map()`| Instance of Map (or an object with a similar API) to be used as cache. |
-| `cacheParamsFn`           | `Function`   |      defaultCacheParamsFn      | A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and removes any non-serializable items. The default function returns traverses params and removes any functions.
-| `cacheKeyFn`      |  `Function`  | defaultCacheKeyFn | Normalize keys. `(key) => key && key.toString ? key.toString() : String(key)` |
-
-
-```js
-  const { FindLoader } = require("feathers-dataloader");
-
-  const loader = new FindLoader({
-    service: app.service('users'),
-    cacheMap: new Map(),
-    cacheParamsFn: (params) => {
-      return {
-        paginate: false,
-        query: params.query,
-        user_id: params.user.id
-      }
-    }
-    cacheKeyFn: (key) => key
-  });
-
- const users = await loader.load(params);
- loader.clear(params);
- loader.clearAll();
-```
-
-<!--- class GetLoader --------------------------------------------------------------------------->
-<h2 id="class-getloader">class GetLoader( [, options] )</h2>
-
-Create a new GetLoader. Create a loader that caches `get()` requests based on their id/params. GetLoaders are used by ServiceLoaders when calling `get(id, params)`.
-
-- **Arguments:**
-  - `{Object} [ options ]`
-    - `{Object} service`
-    - `{Object} cacheMap`
-    - `{Function} cacheParamsFn`
-    - `{Function} cacheKeyFn`
-
-| Argument        |    Type    |   Default  | Description                                      |
-| --------------- | :--------: | ---------- | ------------------------------------------------ |
-| `service`           | `Object`   |            | A service for this loader. For example, `app.service('users')`                                   |
-| `cacheMap`      |  `Object`  | `new Map()`| Instance of Map (or an object with a similar API) to be used as cache. |
-| `cacheParamsFn`           | `Function`   |      defaultCacheParamsFn      | A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and removes any non-serializable items. The default function returns traverses params and removes any functions.
-| `cacheKeyFn`      |  `Function`  | defaultCacheKeyFn | Normalize keys. `(key) => key && key.toString ? key.toString() : String(key)` |
-
-
-```js
-  const { GetLoader } = require("feathers-dataloader");
-
-  const loader = new GetLoader({
-    service: app.service('users'),
-    cacheMap: new Map(),
-    cacheParamsFn: (params) => {
-      return {
-        paginate: false,
-        query: params.query,
-        user_id: params.user.id
-      }
-    }
-    cacheKeyFn: (key) => key
-  });
-
-  const user = await loader.load(1, params);
-  loader.clear(id, params);
-  loader.clearAll();
-```
-
 
 <!--- class DataLoader --------------------------------------------------------------------------->
 <h2 id="class-dataloader">class DataLoader( batchLoadFunc [, options] )</h2>

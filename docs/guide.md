@@ -33,7 +33,7 @@ app.hooks({
 })
 
 // No need to manually pass the loader because AsyncLocalStorage
-// in the initializeLoader functions automatically passes it.
+// in the initializeLoader functions automatically passes it!
 const postResultsResolver = resolve({
   properties: {
     user: (value, post, context) => {
@@ -74,7 +74,7 @@ const postResultsResolver = resolve({
     user: (value, post, context) => {
       const { loader } = context.params;
       // We get user for free here! The loader is already cached
-      // because we used it in the validateUserId before hook
+      // because we used it in the validateUserId before hook.
       return loader.service('users').get(post.userId);
     }
   }
@@ -94,12 +94,22 @@ app.service('posts').hooks({
 
 ## Clear loaders after mutation
 
-Even though loaders are generally created/destroyed with each request, its good practice to clear the cache after mutations. When using `AppLoader` and `ServiceLoader`, there is only one method `clearAll()` to clear the loader caches. Because of the lazy config when using these classes, its difficult for the developer to know all of the potential method/ids/params combos that may be cached. Instead, the `clearAll()` method dumps the whole cache. If any subsequent calls are made to the loader for this service it will return new results.
+Even though loaders are generally created/destroyed with each request, its good practice to clear the cache after mutations. When using `AppLoader` and `ServiceLoader`, there is only one method `clear()` to clear the loader caches. Because of the lazy config when using these classes, its difficult for the developer to know all of the potential method/ids/params combos that may be cached. Instead, the `clear()` method dumps the whole cache. If any subsequent calls are made to the loader for this service it will return new results.
 
 ```js
 const clearLoaderCache = async (context) => {
-  const loader = context.params.loader.service('users');
-  loader.clearAll();
+  const { loader } = context.params;
+
+  // Clear this service's cache
+  loader.service('posts').clear();
+
+  // This update may have affected other services too.
+  // If you know what services were changed you can clear them.
+  loader.service('posts').clear();
+
+  // Or you can clear all services at once
+  loader.clear();
+
   return context;
 };
 
@@ -115,7 +125,7 @@ But, you can get access to the underlying caches as well. You should use this wi
 ```js
 const clearLoaderCache = async (context) => {
   const loader = context.params.loader.service('users');
-  loader._cacheMap.forEach((loader, loaderKey) => {
+  loader.cacheMap.forEach((result, key) => {
     // Write code that will break your app...
   });
   return context;
@@ -136,14 +146,14 @@ Loaders returned cached results each time you call a method. This is dissimilar 
 // For get/find requests, each result is unique
 const user1 = await app.service('users').get(1);
 const user2 = await app.service('users').get(1);
-user1.name = 'DaddyWarbucks';
-user2.name === 'DaddyWarbucks' // false
+user1.name = 'FeathersUser';
+user2.name === 'FeathersUser' // false
 
 // For each method of a loader, results are cached and shared
 const user1 = await loader.service('users').load(1);
 const user2 = await loader.service('users').load(1);
-user1.name = 'DaddyWarbucks';
-user2.name === 'DaddyWarbucks'; // true
+user1.name = 'FeathersUser';
+user2.name === 'FeathersUser'; // true
 ```
 
 
@@ -152,6 +162,8 @@ user2.name === 'DaddyWarbucks'; // true
 Loaders use a stringified copy of the id and params used for each method call. This means that functions, classes, transactions, etc cannot be used in a cache key. By default, this library recursively traverses params and removes any functions from the params before stringifying them. But, you may need to create a custom strategy for your use case.
 
 ```js
+
+const { AppLoader } = require('feathers-dataloader');
 
 const cacheParamsFn = params => {
   return {
@@ -177,5 +189,70 @@ const loader = new AppLoader({
 // Pass a cacheParamsFn on each method invocation.
 // This will override the service and global configuration.
 const result = loader.service('users').load(1, params, cacheParamsFn)
+```
+
+## Extending the base class
+
+The AppLoader constructor takes an option that allows you to pass a class that will be used to create each new ServiceLoader. You can use this class to extend the base ServiceLoader class with your own methods.
+
+```js
+const { AppLoader, ServiceLoader } = require('feathers-dataloader');
+
+class MyLoader extends ServiceLoader {
+  constructor(...args) {
+    super(...args)
+  }
+
+  async findOne(params) {
+    const cacheKey = this.stringifyKey(params);
+
+    const cachedResult = await this.cacheMap.get(cacheKey);
+
+    if (cachedResult) {
+      cachedResult
+    }
+
+    const result = await this.options.service.find({
+      ...params,
+      query: {
+        ...params.query,
+        $limit: 1
+      }
+    })
+
+    const found = result.data[0] || null
+
+    await this.cacheMap.set(cacheKey, found);
+
+    return found;
+  }
+
+  async count(params) {
+    const cacheKey = this.stringifyKey(params);
+
+    const cachedResult = await this.cacheMap.get(cacheKey);
+
+    if (cachedResult) {
+      cachedResult
+    }
+
+    const result = await this.options.service.find({
+      ...params,
+      query: {
+        ...params.query,
+        $limit: -1
+      }
+    })
+
+    await this.cacheMap.set(cacheKey, result.total);
+
+    return result.total;
+  }
+}
+
+const loader = new AppLoader({ app, ServiceLoader: MyLoader });
+
+const result = loader.service('users').findOne(params)
+const result = loader.service('users').count(params)
 ```
 
