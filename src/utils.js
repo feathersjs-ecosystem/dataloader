@@ -1,8 +1,8 @@
 const { GeneralError } = require('@feathersjs/errors')
 
-const isObject = (module.exports.isObject = (obj) => {
+const isObject = (obj) => {
   return obj && typeof obj === 'object' && !Array.isArray(obj)
-})
+}
 
 module.exports.stableStringify = (obj) => {
   return JSON.stringify(obj, (key, value) => {
@@ -28,13 +28,13 @@ module.exports.stableStringify = (obj) => {
 // Conveniece method for users that strips off any functions
 // that can't be serialized in the key. Returning undefined
 // is fine because the JSON.stringify will remove it
-function traverse(params) {
+const removeFunctions = (params) => {
   if (Array.isArray(params)) {
-    return params.map(traverse)
+    return params.map(removeFunctions)
   }
   if (isObject(params)) {
     return Object.entries(params).reduce((accum, [key, value]) => {
-      accum[key] = traverse(value)
+      accum[key] = removeFunctions(value)
       return accum
     }, {})
   }
@@ -46,9 +46,9 @@ function traverse(params) {
 
 module.exports.defaultCacheParamsFn = (params) => {
   if (!params) {
-    return {}
+    return params
   }
-  return traverse(params)
+  return removeFunctions(params)
 }
 
 module.exports.defaultCacheKeyFn = (id) => {
@@ -71,14 +71,14 @@ module.exports.uniqueKeys = (keys) => {
   return unique
 }
 
-module.exports.uniqueResults = (keys, result, idKey = 'id', defaultValue = null) => {
+module.exports.uniqueResults = (keys, result, key = 'id', defaultValue = null) => {
   const serviceResults = result.data || result
   const found = {}
   const results = []
 
   for (let index = 0, length = serviceResults.length; index < length; ++index) {
     const result = serviceResults[index]
-    const id = result[idKey]
+    const id = result[key]
     found[id] = result
   }
 
@@ -89,14 +89,14 @@ module.exports.uniqueResults = (keys, result, idKey = 'id', defaultValue = null)
   return results
 }
 
-module.exports.uniqueResultsMulti = (keys, result, idKey = 'id', defaultValue = null) => {
+module.exports.uniqueResultsMulti = (keys, result, key = 'id', defaultValue = null) => {
   const serviceResults = result.data || result
   const found = {}
   const results = []
 
   for (let index = 0, length = serviceResults.length; index < length; ++index) {
     const result = serviceResults[index]
-    const id = result[idKey]
+    const id = result[key]
     if (found[id]) {
       found[id].push(result)
     } else {

@@ -6,9 +6,9 @@ const {
   stableStringify,
   defaultCacheParamsFn,
   defaultCacheKeyFn
-} = require('../lib/utils')
+} = require('../src/utils')
 
-describe('appLoader.test', () => {
+describe('utils.test', () => {
   it('uniqueKeys dedupes keys', () => {
     const keys = [1, 1, 2, 2]
     const newKeys = uniqueKeys(keys)

@@ -34,5 +34,19 @@ function makeApp() {
   app.use('posts', memory({ store: postsStore }))
   app.use('comments', memory({ store: commentsStore }))
   app.use('users', memory({ store: usersStore }))
+
+  const callbackHook = async (context) => {
+    if (context.params.callback) {
+      await context.params.callback(context)
+    }
+    return context;
+  }
+
+  app.hooks({
+    before: {
+      all: [callbackHook]
+    }
+  })
+
   return app
 }
