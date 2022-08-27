@@ -18,8 +18,9 @@
     "url": "git@github.com:feathersjs-ecosystem/dataloader.git"
   },
   "author": {
-    "name": "John J. Szwaronek",
-    "email": "johnsz9999@gmail.com"
+    "name": "Feathers contributors",
+    "email": "hello@feathersjs.com",
+    "url": "https://feathersjs.com"
   },
   "contributors": [],
   "bugs": {

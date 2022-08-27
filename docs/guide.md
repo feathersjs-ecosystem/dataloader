@@ -224,7 +224,7 @@ class MyLoader extends ServiceLoader {
   }
 
   async findOne(params) {
-    const cacheKey = this.stringifyKey(params);
+    const cacheKey = this.stringifyKey({ method: 'findOne', params });
 
     const cachedResult = await this.cacheMap.get(cacheKey);
 
@@ -248,7 +248,7 @@ class MyLoader extends ServiceLoader {
   }
 
   async count(params) {
-    const cacheKey = this.stringifyKey(params);
+    const cacheKey = this.stringifyKey({ method: 'count', params });
 
     const cachedResult = await this.cacheMap.get(cacheKey);
 
