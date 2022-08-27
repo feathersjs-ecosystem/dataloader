@@ -138,6 +138,26 @@ app.service('posts').hooks({
 });
 ```
 
+## Use a `maxBatchSize`
+
+The DataLoader underlying ServiceLoader takes a `maxBatchSize` option. This option limits the number of ids in the `$in` query. Huge arrays of ids can lead to performance issues and even database lockup. By using the `maxBatchSize` you can break those queries into smaller ones. You should monitor your own application to determine the best number to use for your batch size, but setting some maximum is recommended.
+
+```js
+const { AppLoader, ServiceLoader } = require('feathers-dataloader');
+
+const loader = new AppLoader({ app, maxBatchSize: 100 });
+
+await Promise.all([
+  // ...1,000 service calls
+  loader.service('users').get(id)
+])
+
+// The query will be broken up into 10 calls with 100 ids each
+const query = {
+  id: { $in: [...100 ids] }
+}
+```
+
 ## Don't mutate loader results
 
 Loaders returned cached results each time you call a method. This is dissimilar to standard `get()` and `find()` methods in Featers where we expect each set of results to be unique each time a method is called. Take care not to mutate loader results as you work with them.
@@ -188,7 +208,7 @@ const loader = new AppLoader({
 
 // Pass a cacheParamsFn on each method invocation.
 // This will override the service and global configuration.
-const result = loader.service('users').load(1, params, cacheParamsFn)
+const result = loader.service('users').load(1, params, cacheParamsFn);
 ```
 
 ## Extending the base class
@@ -209,7 +229,7 @@ class MyLoader extends ServiceLoader {
     const cachedResult = await this.cacheMap.get(cacheKey);
 
     if (cachedResult) {
-      cachedResult
+      return cachedResult
     }
 
     const result = await this.options.service.find({
@@ -220,7 +240,7 @@ class MyLoader extends ServiceLoader {
       }
     })
 
-    const found = result.data[0] || null
+    const found = result.data[0] || null;
 
     await this.cacheMap.set(cacheKey, found);
 
@@ -233,7 +253,7 @@ class MyLoader extends ServiceLoader {
     const cachedResult = await this.cacheMap.get(cacheKey);
 
     if (cachedResult) {
-      cachedResult
+      return cachedResult;
     }
 
     const result = await this.options.service.find({
@@ -252,7 +272,6 @@ class MyLoader extends ServiceLoader {
 
 const loader = new AppLoader({ app, ServiceLoader: MyLoader });
 
-const result = loader.service('users').findOne(params)
-const result = loader.service('users').count(params)
+const result = loader.service('users').findOne(params);
+const result = loader.service('users').count(params);
 ```
-
