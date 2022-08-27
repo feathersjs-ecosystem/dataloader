@@ -1,9 +1,9 @@
 {
   "name": "feathers-dataloader",
   "description": "Reduce requests to backend services by batching calls and caching records.",
-  "version": "0.3.6",
+  "version": "0.0.1",
   "homepage": "https://github.com/feathersjs-ecosystem/dataloader",
-  "main": "lib/",
+  "main": "src/",
   "types": "types/",
   "keywords": [
     "feathers",
@@ -26,7 +26,7 @@
     "url": "https://github.com/feathersjs-ecosystem/dataloader/issues"
   },
   "engines": {
-    "node": ">= 14"
+    "node": ">= 12"
   },
   "scripts": {
     "publish": "git push origin --tags && npm run changelog && git push origin",
@@ -42,7 +42,7 @@
     "test": "npm run prettier && npm run coverage"
   },
   "directories": {
-    "lib": "lib"
+    "src": "src"
   },
   "devDependencies": {
     "@feathersjs/feathers": "^5.0.0-pre.28",
