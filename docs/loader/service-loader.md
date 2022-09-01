@@ -196,12 +196,12 @@ await app.service('users').key('email').load('icecream@strausmilk.com')
 This example returns an array of users, one for each `email` in the array. The order of the returned users will match the index of their corresponding `email` in the array. This is kind of like a query using `{ email: { $in: emails } }`, and returns the results in an idempotent order.
 
 ```js
-await app.service('users').load(['one@test.com', 'two@test.com', 'three@test.com'])
+await app.service('users').key('email').load(['one@test.com', 'two@test.com', 'three@test.com'])
 /*
 [
-  { id: 72, name: 'one@test.com' },
-  { id: 26, name: 'two@test.com' },
-  { id: 23, name: 'three@test.com' }
+  { id: 72, email: 'one@test.com' },
+  { id: 26, email: 'two@test.com' },
+  { id: 23, email: 'three@test.com' }
 ]
 */
 ```
