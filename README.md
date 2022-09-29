@@ -1,4 +1,4 @@
-# feathers-ecosystem/feathers-dataloader
+# feathers-dataloader
 
 > Reduce requests to backend services by batching calls and caching records.
 
