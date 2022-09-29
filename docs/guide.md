@@ -75,7 +75,7 @@ const postResultsResolver = resolve({
       const { loader } = context.params;
       // We get user for free here! The loader is already cached
       // because we used it in the validateUserId before hook.
-      return loader.service('users').get(post.userId);
+      return loader.service('users').load(post.userId);
     }
   }
 });
@@ -140,7 +140,7 @@ app.service('posts').hooks({
 
 ## Use a `maxBatchSize`
 
-The DataLoader underlying ServiceLoader takes a `maxBatchSize` option. This option limits the number of ids in the `$in` query. Huge arrays of ids can lead to performance issues and even database lockup. By using the `maxBatchSize` you can break those queries into smaller ones. You should monitor your own application to determine the best number to use for your batch size, but setting some maximum is recommended.
+The ServiceLoader's underlying DataLoader takes a `maxBatchSize` option. This option limits the number of ids in the `$in` query. Huge arrays of ids can lead to performance issues and even database lockup. By using the `maxBatchSize` you can break those queries into smaller ones. You should monitor your own application to determine the best number to use for your batch size, but setting some maximum is recommended.
 
 ```js
 const { AppLoader, ServiceLoader } = require('feathers-dataloader');
@@ -149,7 +149,7 @@ const loader = new AppLoader({ app, maxBatchSize: 100 });
 
 await Promise.all([
   // ...1,000 service calls
-  loader.service('users').get(id)
+  loader.service('users').load(id)
 ])
 
 // The query will be broken up into 10 calls with 100 ids each
