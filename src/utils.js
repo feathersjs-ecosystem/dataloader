@@ -16,7 +16,7 @@ module.exports.stableStringify = (object) => {
       const keys = Object.keys(value).sort()
       const result = {}
       for (let index = 0, length = keys.length; index < length; ++index) {
-        const key = keys[index];
+        const key = keys[index]
         result[key] = value[key]
       }
       return result
@@ -37,7 +37,7 @@ const removeFunctions = (params) => {
     const keys = Object.keys(params)
     const result = {}
     for (let index = 0, length = keys.length; index < length; ++index) {
-      const key = keys[index];
+      const key = keys[index]
       result[key] = removeFunctions(params[key])
     }
     return result
@@ -67,7 +67,7 @@ module.exports.uniqueKeys = (keys) => {
   const unique = []
 
   for (let index = 0, length = keys.length; index < length; ++index) {
-    const key = keys[index];
+    const key = keys[index]
     if (!found[key]) {
       found[key] = unique.push(key)
     }
