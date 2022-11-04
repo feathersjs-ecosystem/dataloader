@@ -9,19 +9,13 @@ const {
   uniqueResultsMulti
 } = require('./utils')
 
-const createDataLoader = ({
-  service,
-  key,
-  loaderOptions,
-  multi,
-  method,
-  params = {}
-}) => {
-
-  const serviceMethod = method === '_load' ? '_find' : 'find';
+const createDataLoader = ({ service, key, loaderOptions, multi, method, params = {} }) => {
+  const serviceMethod = method === '_load' ? '_find' : 'find'
 
   if (!service[serviceMethod]) {
-    throw new GeneralError(`Cannot create a loader for a service that does not have a ${serviceMethod} method.`)
+    throw new GeneralError(
+      `Cannot create a loader for a service that does not have a ${serviceMethod} method.`
+    )
   }
 
   const getResults = multi ? uniqueResultsMulti : uniqueResults
@@ -35,19 +29,12 @@ const createDataLoader = ({
         // TODO: Should this be placed in an $and query?
         [key]: { $in: uniqueKeys(keys) }
       }
-    })
-      .then((result) => getResults(keys, result, key))
+    }).then((result) => getResults(keys, result, key))
   }, loaderOptions)
 }
 
 module.exports = class ServiceLoader {
-  constructor({
-    service,
-    name,
-    cacheParamsFn,
-    cacheMap,
-    ...loaderOptions
-  }) {
+  constructor({ service, name, cacheParamsFn, cacheMap, ...loaderOptions }) {
     this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
     this.options = {
@@ -90,21 +77,22 @@ module.exports = class ServiceLoader {
 
       await this.cacheMap.set(cacheKey, result)
 
-      return result;
+      return result
     }
 
     // stableStringify does not sort arrays on purpose because
     // array order matters in most cases. In this case, the
     // order of ids does not matter to the load function but
     // does to the cache key, thats why these are sorted.
-    const sortedId = Array.isArray(options.id)
-      ? [...options.id].sort()
-      : options.id;
+    const sortedId = Array.isArray(options.id) ? [...options.id].sort() : options.id
 
-    const cacheKey = this.stringifyKey({
-      ...options,
-      id: sortedId,
-    }, cacheParamsFn)
+    const cacheKey = this.stringifyKey(
+      {
+        ...options,
+        id: sortedId
+      },
+      cacheParamsFn
+    )
 
     const cachedResult = await this.cacheMap.get(cacheKey)
 
@@ -112,22 +100,27 @@ module.exports = class ServiceLoader {
       return cachedResult
     }
 
-    const loaderKey = this.stringifyKey({
-      key: options.key,
-      multi: options.multi,
-      method: options.method,
-      params: options.params,
-      service: name
-    }, cacheParamsFn)
+    const loaderKey = this.stringifyKey(
+      {
+        key: options.key,
+        multi: options.multi,
+        method: options.method,
+        params: options.params,
+        service: name
+      },
+      cacheParamsFn
+    )
 
-    const dataLoader = this.loaders.get(loaderKey) || createDataLoader({
-      key: options.key,
-      multi: options.multi,
-      method: options.method,
-      params: options.params,
-      service,
-      loaderOptions,
-    })
+    const dataLoader =
+      this.loaders.get(loaderKey) ||
+      createDataLoader({
+        key: options.key,
+        multi: options.multi,
+        method: options.method,
+        params: options.params,
+        service,
+        loaderOptions
+      })
 
     this.loaders.set(loaderKey, dataLoader)
 
@@ -137,7 +130,7 @@ module.exports = class ServiceLoader {
 
     await this.cacheMap.set(cacheKey, result)
 
-    return result;
+    return result
   }
 
   get(id, params, cacheParamsFn) {

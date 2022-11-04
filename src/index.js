@@ -9,5 +9,5 @@ module.exports = {
   ServiceLoader,
   uniqueKeys,
   uniqueResults,
-  uniqueResultsMulti,
+  uniqueResultsMulti
 }
