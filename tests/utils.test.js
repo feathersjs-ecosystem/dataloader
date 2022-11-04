@@ -92,13 +92,18 @@ describe('utils.test', () => {
     assert.deepEqual(defaultCacheKeyFn(_id), '1')
   })
 
-  it('defaultCacheParamsFn only returns query', () => {
-    const query = { prop: 'prop' }
+  it('defaultCacheParamsFn only returns valid props', () => {
+    const safeParams = {
+      provider: 'rest',
+      authentication: { prop: 1 },
+      user: { prop: 1 },
+      query: { prop: 1 }
+    }
     const params = {
-      query,
+      ...safeParams,
       otherProp: 'otherProp'
     }
     const cacheParams = defaultCacheParamsFn(params)
-    assert.deepEqual(cacheParams, { query })
+    assert.deepEqual(cacheParams, safeParams)
   })
 })

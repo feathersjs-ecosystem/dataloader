@@ -71,7 +71,7 @@ Create a new GetLoader. Create a loader that caches `get()` requests based on th
 - **options** `{Object}`
   - **service** `{Object}` - A service for this loader, like `app.service('users')`
   - **cacheMap** `{Object}` - Instance of Map (or an object with a similar API) to be used as cache. Defaults to `new Map()`
-  - **cacheParamsFn** `{Function}` - A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and removes any non-serializable items. The default function returns traverses params and removes any functions. Defaults to `defaultCacheParamsFn`.
+  - **cacheParamsFn** `{Function}` - A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and remove any non-serializable items. The default function returns params.provider, params.authentication, params.user, and params.query. Defaults to `defaultCacheParamsFn`.
   - **cacheKeyFn** `{Function}` - Normalize keys. `(key) => key && key.toString ? key.toString() : String(key)` Defaults to `defaultCacheKeyFn`.
 
 ### GetLoader Example

@@ -34,6 +34,9 @@ module.exports.defaultCacheParamsFn = (params) => {
     return params
   }
   return {
+    provider: params.provider,
+    authentication: params.authentication,
+    user: params.user,
     query: params.query
   }
 }
