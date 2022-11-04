@@ -92,25 +92,13 @@ describe('utils.test', () => {
     assert.deepEqual(defaultCacheKeyFn(_id), '1')
   })
 
-  it('defaultCacheParamsFn strips out functions', () => {
-    const func = () => {}
-    const name = 'DaddyWarbucks'
-    const cacheParams = defaultCacheParamsFn({
-      name,
-      func,
-      props: {
-        func,
-        name,
-        array: [{ func, name }]
-      }
-    })
-
-    assert.deepEqual(cacheParams.name, name)
-    assert.deepEqual(cacheParams.props.name, name)
-    assert.deepEqual(cacheParams.props.array[0].name, name)
-
-    assert.deepEqual(cacheParams.func, undefined)
-    assert.deepEqual(cacheParams.props.func, undefined)
-    assert.deepEqual(cacheParams.props.array[0].func, undefined)
+  it('defaultCacheParamsFn only returns query', () => {
+    const query = { prop: 'prop' }
+    const params = {
+      query,
+      otherProp: 'otherProp'
+    }
+    const cacheParams = defaultCacheParamsFn(params)
+    assert.deepEqual(cacheParams, { query })
   })
 })

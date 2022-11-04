@@ -1,7 +1,10 @@
 const { GeneralError } = require('@feathersjs/errors')
 
 const isObject = (obj) => {
-  return obj && typeof obj === 'object' && !Array.isArray(obj)
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return false
+  }
+  return Object.getPrototypeOf(obj) === Object.prototype
 }
 
 module.exports.stableStringify = (object) => {
@@ -16,7 +19,7 @@ module.exports.stableStringify = (object) => {
       const keys = Object.keys(value).sort()
       const result = {}
       for (let index = 0, length = keys.length; index < length; ++index) {
-        const key = keys[index];
+        const key = keys[index]
         result[key] = value[key]
       }
       return result
@@ -26,33 +29,13 @@ module.exports.stableStringify = (object) => {
   })
 }
 
-// Conveniece method for users that strips off any functions
-// that can't be serialized in the key. Returning undefined
-// is fine because the JSON.stringify will remove it
-const removeFunctions = (params) => {
-  if (Array.isArray(params)) {
-    return params.map(removeFunctions)
-  }
-  if (isObject(params)) {
-    const keys = Object.keys(params)
-    const result = {}
-    for (let index = 0, length = keys.length; index < length; ++index) {
-      const key = keys[index];
-      result[key] = removeFunctions(params[key])
-    }
-    return result
-  }
-  if (typeof params === 'function') {
-    return undefined
-  }
-  return params
-}
-
 module.exports.defaultCacheParamsFn = (params) => {
   if (!params) {
     return params
   }
-  return removeFunctions(params)
+  return {
+    query: params.query
+  }
 }
 
 module.exports.defaultCacheKeyFn = (id) => {
@@ -67,7 +50,7 @@ module.exports.uniqueKeys = (keys) => {
   const unique = []
 
   for (let index = 0, length = keys.length; index < length; ++index) {
-    const key = keys[index];
+    const key = keys[index]
     if (!found[key]) {
       found[key] = unique.push(key)
     }
