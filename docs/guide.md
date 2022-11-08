@@ -179,8 +179,7 @@ user2.name === 'FeathersUser'; // true
 
 ## Params Caching
 
-Loaders use a stringified copy of the id and params used for each method call. This means that functions, classes, transactions, etc cannot be used in a cache key. By default, this library recursively traverses params and removes any functions from the params before stringifying them. But, you may need to create a custom strategy for your use case.
-
+Loaders use a stringified copy of the id and params for each method call as its cache key. By default, this library only returns the `params.authentication`, `params.user`, `params.provider`, and `params.query` to be used in the cache key. Note that ALL params are passed to the underlying service call but only the params mentioned are used in the cache key. This works for most uses cases. If your system uses other params to authorize/shape the result, such as custom database adapter params like `params.mongodb`, `params.mongoose`, `params.sequelize`, you can provide a custom `cacheParamsFn` function in three places.
 ```js
 
 const { AppLoader } = require('feathers-dataloader');
