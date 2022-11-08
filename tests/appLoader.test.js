@@ -4,6 +4,10 @@ const { makeApp } = require('./utils')
 
 const testFunc = () => {}
 
+class TestLoader {
+  findOne() {}
+}
+
 describe('appLoader.test', () => {
   const app = makeApp()
   it('creates an AppLoader', () => {
@@ -65,12 +69,19 @@ describe('appLoader.test', () => {
     assert.deepEqual(appLoader.loaders.size, 0)
   })
 
-  it('takes a base class', () => {
-    class MyLoader {
-      findOne() {}
-    }
+  it('takes a base class in global config', () => {
+    const appLoader = new AppLoader({ app, ServiceLoader: TestLoader })
+    const serviceLoader = appLoader.service('posts')
+    assert.isFunction(serviceLoader.findOne)
+  })
 
-    const appLoader = new AppLoader({ app, ServiceLoader: MyLoader })
+  it('takes a base class in service config', () => {
+    const appLoader = new AppLoader({
+      app,
+      services: {
+        posts: { ServiceLoader: TestLoader }
+      }
+    })
     const serviceLoader = appLoader.service('posts')
     assert.isFunction(serviceLoader.findOne)
   })

@@ -1,13 +1,18 @@
 const BaseServiceLoader = require('./serviceLoader')
+
 module.exports = class AppLoader {
-  constructor({ app, services = {}, ServiceLoader = BaseServiceLoader, ...loaderOptions }) {
-    this.options = { app, services, loaderOptions, ServiceLoader }
+  constructor({ app, services = {}, ...loaderOptions }) {
+    this.options = { app, services, loaderOptions }
     this.loaders = new Map()
   }
 
   service(serviceName) {
-    const { app, services, loaderOptions, ServiceLoader } = this.options
-    const options = { ...loaderOptions, ...(services[serviceName] || {}) }
+    const { app } = this.options
+    const { ServiceLoader, ...loaderOptions } = {
+      ServiceLoader: BaseServiceLoader,
+      ...this.options.loaderOptions,
+      ...(this.options.services[serviceName] || {})
+    }
     const cachedLoader = this.loaders.get(serviceName)
 
     if (cachedLoader) {
@@ -15,7 +20,7 @@ module.exports = class AppLoader {
     }
 
     const loader = new ServiceLoader({
-      ...options,
+      ...loaderOptions,
       name: serviceName,
       service: app.service(serviceName)
     })
