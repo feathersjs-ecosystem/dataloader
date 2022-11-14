@@ -11,57 +11,53 @@ npm install feathers-dataloader --save
 ## Documentation
 
 Please refer to the documentation for more information.
+
 - [Documentation](./docs/index.md) - Definitions for the classes exported from this library
 - [Guide](./docs/guide.md) - Common patterns, tips, and best practices
 
 ## TLDR
 
 ```js
-Promise.all([
-  app.service('posts').get(1),
-  app.service('posts').get(2),
-  app.service('posts').get(3)
-]);
+Promise.all([app.service('posts').get(1), app.service('posts').get(2), app.service('posts').get(3)])
 ```
 
 is slower than
 
 ```js
-app.service('posts').find({ query: { id: { $in: [1, 2, 3] } } });
+app.service('posts').find({ query: { id: { $in: [1, 2, 3] } } })
 ```
 
 Feathers Dataloader makes it easy and fast to write these kinds of queries. The loader handles coalescing all of the IDs into one request and mapping them back to the proper caller.
 
 ```js
-const loader = new AppLoader({ app: context.app });
+const loader = new AppLoader({ app: context.app })
 
 Promise.all([
   loader.service('posts').load(1),
   loader.service('posts').load(2),
   loader.service('posts').load(3)
-]);
+])
 ```
 
 is automatically converted to
 
 ```js
-app.service('posts').find({ query: { id: { $in: [1, 2, 3] } } });
+app.service('posts').find({ query: { id: { $in: [1, 2, 3] } } })
 ```
-
 
 ## Quick Start
 
 ```js
-const { AppLoader } = require('feathers-dataloader');
+const { AppLoader } = require('feathers-dataloader')
 
 // See Guide for more information about how to better pass
 // loaders from service to service.
-const initializeLoader = context => {
+const initializeLoader = (context) => {
   if (context.params.loader) {
-    return context;
+    return context
   }
-  context.params.loader = new AppLoader({ app: context.app });
-  return context;
+  context.params.loader = new AppLoader({ app: context.app })
+  return context
 }
 
 // Use this app hook to ensure that a loader is always configured in
@@ -72,42 +68,40 @@ app.hooks({
   }
 })
 
-
 // Loaders are most commonly used in resolvers like @feathersjs/schema,
 // withResults, or fastJoin. See the Guide section for more
 // information and common usecases.
 // Pass the loader to any and all service/loader calls. This maximizes
 // performance by allowing the loader to reuse its cache and
 // batching mechanism as much as possible.
-const { resolveResult, resolve } = require('@feathersjs/schema');
+const { resolveResult, resolve } = require('@feathersjs/schema')
 
 const postResultsResolver = resolve({
   properties: {
     user: async (value, post, context) => {
-      const { loader } = context.params;
-      return await loader.service('users').load(post.userId, { loader });
+      const { loader } = context.params
+      return await loader.service('users').load(post.userId, { loader })
     },
     category: async (value, post, context) => {
-      const { loader } = context.params;
-      return await loader.service('categories').key('name').load(post.categoryName, { loader });
+      const { loader } = context.params
+      return await loader.service('categories').key('name').load(post.categoryName, { loader })
     },
     tags: async (value, post, context) => {
-      const { loader } = context.params;
-      return await loader.service('tags').load(post.tagIds, { loader });
+      const { loader } = context.params
+      return await loader.service('tags').load(post.tagIds, { loader })
     },
     comments: async (value, post, context) => {
-      const { loader } = context.params;
-      return await loader.service('comments').multi('postId').load(post.id, { loader });
+      const { loader } = context.params
+      return await loader.service('comments').multi('postId').load(post.id, { loader })
     }
   }
-});
-
+})
 
 app.service('posts').hooks({
   after: {
     all: [resolveResult(postResultsResolver)]
   }
-});
+})
 ```
 
 ## Running Tests
@@ -118,6 +112,31 @@ Once you've installed both plugins, you should see two ways to directly run test
 
 - The "test beaker" icon in VSCode's main nav, which will show you a tree of all Mocha tests.
 - A "run" and "debug" codelens link above every Mocha test.
+
+## Usage With TypeScript
+
+Encountering this error? Let's fix it.
+
+```
+error TS2307: Cannot find module 'feathers-dataloader' or its corresponding type declarations.
+```
+
+This package does not currently have TypeScript `@types` declarations, so there are a few steps that will likely need to take in order to use it with a TS codebase.
+
+1. Add custom type definitions for this package. Try adding a declarations file, like `feathers-dataloader.d.ts` to your `src` directory with the following contents:
+
+```js
+  export declare module 'feathers-dataloader' {}
+```
+
+Should the type definition route not work, try this instead:
+
+2. Use Node's var `require` syntax for importing this package. Using `import *** from ***` syntax with this package may not play well with TypeScript, so in that case, try disabling warnings for var requires and importing like this:
+
+```js
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { AppLoader } = require('feathers-dataloader')
+```
 
 ## License
 
