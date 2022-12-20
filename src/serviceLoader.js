@@ -167,6 +167,15 @@ module.exports = class ServiceLoader {
           params,
           cacheParamsFn
         })
+      },
+      _load: (id, params, cacheParamsFn) => {
+        return this.exec({
+          method: '_load',
+          id,
+          key,
+          params,
+          cacheParamsFn
+        })
       }
     }
   }
@@ -176,6 +185,16 @@ module.exports = class ServiceLoader {
       load: (id, params, cacheParamsFn) => {
         return this.exec({
           method: 'load',
+          id,
+          key,
+          params,
+          cacheParamsFn,
+          multi: true
+        })
+      },
+      _load: (id, params, cacheParamsFn) => {
+        return this.exec({
+          method: '_load',
           id,
           key,
           params,

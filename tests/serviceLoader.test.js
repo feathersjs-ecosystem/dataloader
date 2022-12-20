@@ -69,11 +69,28 @@ describe('serviceLoader.test', () => {
     assert.deepEqual(result, defaultResult)
   })
 
+  it('works with key("key")._load(id)', async () => {
+    const serviceLoader = new ServiceLoader({
+      service: app.service('posts')
+    })
+    const defaultResult = await app.service('posts').get(1)
+    const result = await serviceLoader.key('body')._load('John post')
+    assert.deepEqual(result, defaultResult)
+  })
+
   it('works with multi("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       service: app.service('comments')
     })
     const result = await serviceLoader.multi('postId').load(1)
+    assert.deepEqual(result.length, 3)
+  })
+
+  it('works with multi("key")._load(id)', async () => {
+    const serviceLoader = new ServiceLoader({
+      service: app.service('comments')
+    })
+    const result = await serviceLoader.multi('postId')._load(1)
     assert.deepEqual(result.length, 3)
   })
 
