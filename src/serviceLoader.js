@@ -6,8 +6,7 @@ const {
   defaultCacheKeyFn,
   uniqueKeys,
   uniqueResults,
-  uniqueResultsMulti,
-  CacheMap
+  uniqueResultsMulti
 } = require('./utils')
 
 const createDataLoader = ({ service, key, loaderOptions, multi, method, params = {} }) => {
@@ -42,7 +41,7 @@ module.exports = class ServiceLoader {
     cacheMap,
     ...loaderOptions
   }) {
-    this.cacheMap = cacheMap || new CacheMap()
+    this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
     const service = app.service(serviceName)
     this.options = {
@@ -59,7 +58,7 @@ module.exports = class ServiceLoader {
   }
 
   async exec({ cacheParamsFn, ...options }) {
-    const { service, serviceName, loaderOptions } = this.options
+    const { service, loaderOptions } = this.options
 
     options = {
       id: null,
@@ -68,7 +67,6 @@ module.exports = class ServiceLoader {
       multi: false,
       method: 'load',
       ...options,
-      serviceName
     }
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
@@ -114,8 +112,7 @@ module.exports = class ServiceLoader {
         key: options.key,
         multi: options.multi,
         method: options.method,
-        params: options.params,
-        serviceName
+        params: options.params
       },
       cacheParamsFn
     )
@@ -217,6 +214,7 @@ module.exports = class ServiceLoader {
   stringifyKey(options, cacheParamsFn = this.options.cacheParamsFn) {
     return stableStringify({
       ...options,
+      serviceName: this.options.serviceName,
       params: cacheParamsFn(options.params)
     })
   }

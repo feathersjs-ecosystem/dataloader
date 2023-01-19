@@ -165,7 +165,11 @@ describe('serviceLoader.test', () => {
       serviceName: 'posts',
     })
     const cacheKey = serviceLoader.stringifyKey({ id: 1, key: 'id' })
-    const stableKey = stableStringify({ key: 'id', id: 1 })
+    const stableKey = stableStringify({
+      serviceName: 'posts',
+      id: 1,
+      key: 'id'
+    })
     assert.deepEqual(cacheKey, stableKey)
   })
 

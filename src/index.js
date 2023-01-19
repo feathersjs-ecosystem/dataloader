@@ -1,7 +1,11 @@
-const AppLoader = require('./appLoader')
 const DataLoader = require('dataloader')
+const AppLoader = require('./appLoader')
 const ServiceLoader = require('./serviceLoader')
-const { uniqueKeys, uniqueResults, uniqueResultsMulti } = require('./utils')
+const {
+  uniqueKeys,
+  uniqueResults,
+  uniqueResultsMulti
+} = require('./utils')
 
 module.exports = {
   AppLoader,
