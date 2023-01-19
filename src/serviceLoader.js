@@ -7,10 +7,11 @@ const {
   defaultSelectFn,
   uniqueKeys,
   uniqueResults,
-  uniqueResultsMulti
+  uniqueResultsMulti,
+  assign
 } = require('./utils')
 
-const createDataLoader = ({ service, key, loaderOptions, multi, method, params = {} }) => {
+const createDataLoader = ({ service, key, loaderOptions, multi, method, params }) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
 
   if (!service[serviceMethod]) {
@@ -53,24 +54,20 @@ module.exports = class ServiceLoader {
       key: service.options.id,
       selectFn: selectFn || defaultSelectFn,
       cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
-      loaderOptions: {
-        cacheKeyFn: defaultCacheKeyFn,
-        ...loaderOptions
-      }
+      loaderOptions: assign({ cacheKeyFn: defaultCacheKeyFn }, loaderOptions)
     }
   }
 
   async exec({ cacheParamsFn, ...options }) {
     const { service, loaderOptions } = this.options
 
-    options = {
+    options = assign({
       id: null,
       key: this.options.key,
-      params: null,
+      params: {},
       multi: false,
-      method: 'load',
-      ...options,
-    }
+      method: 'load'
+    }, options)
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
       const cacheKey = this.stringifyKey(options, cacheParamsFn)
@@ -167,15 +164,15 @@ module.exports = class ServiceLoader {
   }
 
   key(key) {
-    return new ChainedLoader({ loader: this, key });
+    return new ChainedLoader(this, { key });
   }
 
   multi(key) {
-    return new ChainedLoader({ loader: this, key, multi: true });
+    return new ChainedLoader(this, { key, multi: true });
   }
 
   select(selection) {
-    return new ChainedLoader({ loader: this, selection });
+    return new ChainedLoader(this, { key: this.options.key, selection });
   }
 
   stringifyKey(options, cacheParamsFn = this.options.cacheParamsFn) {
@@ -202,66 +199,74 @@ module.exports = class ServiceLoader {
 }
 
 class ChainedLoader {
-  constructor({ loader, key, selection, multi }) {
+  constructor(loader, options) {
     this.loader = loader;
-    this.options = { loader, key, selection, multi }
+    this.options = options
   }
 
   key(key) {
-    this.options = {
-      ...this.options,
-      key,
-      multi: false
-    }
+    this.options = assign(this.options, { key, multi: false })
     return this;
   }
 
   multi(key) {
-    this.options = {
-      ...this.options,
-      key,
-      multi: true
-    }
+    this.options = assign(this.options, { key, multi: true })
     return this;
   }
 
   select(selection) {
-    this.options = {
-      ...this.options,
-      selection
-    }
+    this.options = assign(this.options, { selection })
     return this;
   }
 
-  _process(result) {
+  handleResult(method, result) {
     const { selection } = this.options;
     const { selectFn, key }  = this.loader.options;
-    if (selection) {
-      result = Array.isArray(result)
-        ? result.map(item => selectFn([key, ...selection], item))
-        : selectFn([key, ...selection], result)
+
+    if (!result || !selection) {
+      return result
     }
-    return result
+
+    const convertResult = (result) => {
+      return selectFn([key, ...selection], result);
+    }
+
+    if (method === 'find' && result.data) {
+      return {
+        ...result,
+        data: result.data.map(convertResult)
+      }
+    }
+
+    if (Array.isArray(result)) {
+      return result.map((result) => {
+        return Array.isArray(result)
+          ? result.map(convertResult)
+          : convertResult(result)
+      })
+    }
+
+    return convertResult(result)
   }
 
   async get(id, params, cacheParamsFn) {
     const result = await this.loader.get(id, params, cacheParamsFn)
-    return this._process(result)
+    return this.handleResult('get', result)
   }
 
   async _get(id, params, cacheParamsFn) {
     const result = await this.loader._get(id, params, cacheParamsFn)
-    return this._process(result)
+    return this.handleResult('_get', result)
   }
 
   async find(params, cacheParamsFn) {
     const result = await this.loader.find(params, cacheParamsFn)
-    return this._process(result)
+    return this.handleResult('find', result)
   }
 
   async _find(params, cacheParamsFn) {
     const result = await this.loader._find(params, cacheParamsFn)
-    return this._process(result)
+    return this.handleResult('_find', result)
   }
 
   async load(id, params, cacheParamsFn) {
@@ -273,7 +278,7 @@ class ChainedLoader {
       key: this.options.key,
       multi: this.options.multi
     })
-    return this._process(result)
+    return this.handleResult('load', result)
   }
 
   async _load(id, params, cacheParamsFn) {
@@ -285,6 +290,6 @@ class ChainedLoader {
       key: this.options.key,
       multi: this.options.multi
     })
-    return this._process(result)
+    return this.handleResult('_load', result)
   }
 }

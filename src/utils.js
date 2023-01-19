@@ -58,6 +58,16 @@ module.exports.defaultSelectFn = (selection, source) => {
   }, {})
 }
 
+module.exports.assign = (target, source) => {
+  const result = { ...target }
+  Object.keys(source).forEach((key) => {
+    if (source[key] !== undefined) {
+      result[key] = source[key]
+    }
+  })
+  return result;
+}
+
 module.exports.uniqueKeys = (keys) => {
   const found = {}
   const unique = []
