@@ -119,7 +119,7 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).load()', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await serviceLoader.load(1)
     const selectedResult = await serviceLoader.select(['body']).load(1)
@@ -134,7 +134,7 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).get()', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await serviceLoader.get(1)
     const selectedResult = await serviceLoader.select(['body']).get(1)
@@ -149,55 +149,59 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).find()', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await serviceLoader.find()
     const selectedResult = await serviceLoader.select(['body']).find()
-    assert.deepEqual(selectedResult, defaultResult.map((result) => {
-      return {
-        id: result.id,
-        body: result.body
-      }
-    }))
+    assert.deepEqual(
+      selectedResult,
+      defaultResult.map((result) => {
+        return {
+          id: result.id,
+          body: result.body
+        }
+      })
+    )
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 
   it('works with select(selection).load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await serviceLoader.load([1, 2])
     const selectedResult = await serviceLoader.select(['body']).load([1, 2])
-    assert.deepEqual(selectedResult, defaultResult.map((result) => {
-      return {
-        id: result.id,
-        body: result.body
-      }
-    }))
+    assert.deepEqual(
+      selectedResult,
+      defaultResult.map((result) => {
+        return {
+          id: result.id,
+          body: result.body
+        }
+      })
+    )
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 
   it('works with select(selection).multi(key).load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments',
+      serviceName: 'comments'
     })
-    const defaultResult = await serviceLoader
-      .multi('postId')
-      .load([1, 2])
-    const selectedResult = await serviceLoader
-      .select(['text'])
-      .multi('postId')
-      .load([1, 2])
-    assert.deepEqual(selectedResult, defaultResult.map((result) => {
-      return result.map(result => {
-        return {
-          id: result.id,
-          text: result.text
-        }
+    const defaultResult = await serviceLoader.multi('postId').load([1, 2])
+    const selectedResult = await serviceLoader.select(['text']).multi('postId').load([1, 2])
+    assert.deepEqual(
+      selectedResult,
+      defaultResult.map((result) => {
+        return result.map((result) => {
+          return {
+            id: result.id,
+            text: result.text
+          }
+        })
       })
-    }))
+    )
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 

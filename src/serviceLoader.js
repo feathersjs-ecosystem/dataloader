@@ -38,14 +38,7 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params }
 }
 
 module.exports = class ServiceLoader {
-  constructor({
-    app,
-    serviceName,
-    cacheParamsFn,
-    selectFn,
-    cacheMap,
-    ...loaderOptions
-  }) {
+  constructor({ app, serviceName, cacheParamsFn, selectFn, cacheMap, ...loaderOptions }) {
     this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
     const service = app.service(serviceName)
@@ -63,13 +56,16 @@ module.exports = class ServiceLoader {
   async exec({ cacheParamsFn, ...options }) {
     const { service, loaderOptions } = this.options
 
-    options = assign({
-      id: null,
-      key: this.options.key,
-      params: {},
-      multi: false,
-      method: 'load'
-    }, options)
+    options = assign(
+      {
+        id: null,
+        key: this.options.key,
+        params: {},
+        multi: false,
+        method: 'load'
+      },
+      options
+    )
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
       const cacheKey = this.stringifyKey(options, cacheParamsFn)
@@ -166,15 +162,15 @@ module.exports = class ServiceLoader {
   }
 
   key(key) {
-    return new ChainedLoader(this, { key });
+    return new ChainedLoader(this, { key })
   }
 
   multi(key) {
-    return new ChainedLoader(this, { key, multi: true });
+    return new ChainedLoader(this, { key, multi: true })
   }
 
   select(selection) {
-    return new ChainedLoader(this, { key: this.options.key, selection });
+    return new ChainedLoader(this, { key: this.options.key, selection })
   }
 
   stringifyKey(options, cacheParamsFn = this.options.cacheParamsFn) {
@@ -202,35 +198,35 @@ module.exports = class ServiceLoader {
 
 class ChainedLoader {
   constructor(loader, options) {
-    this.loader = loader;
+    this.loader = loader
     this.options = options
   }
 
   key(key) {
     this.options = assign(this.options, { key, multi: false })
-    return this;
+    return this
   }
 
   multi(key) {
     this.options = assign(this.options, { key, multi: true })
-    return this;
+    return this
   }
 
   select(selection) {
     this.options = assign(this.options, { selection })
-    return this;
+    return this
   }
 
   handleResult(method, result) {
-    const { selection } = this.options;
-    const { selectFn, key }  = this.loader.options;
+    const { selection } = this.options
+    const { selectFn, key } = this.loader.options
 
     if (!result || !selection) {
       return result
     }
 
     const convertResult = (result) => {
-      return selectFn([key, ...selection], result);
+      return selectFn([key, ...selection], result)
     }
 
     if (method === 'find' && result.data) {
@@ -242,9 +238,7 @@ class ChainedLoader {
 
     if (Array.isArray(result)) {
       return result.map((result) => {
-        return Array.isArray(result)
-          ? result.map(convertResult)
-          : convertResult(result)
+        return Array.isArray(result) ? result.map(convertResult) : convertResult(result)
       })
     }
 

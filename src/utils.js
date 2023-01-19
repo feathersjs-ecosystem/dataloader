@@ -65,7 +65,7 @@ module.exports.assign = (target, source) => {
       result[key] = source[key]
     }
   })
-  return result;
+  return result
 }
 
 module.exports.uniqueKeys = (keys) => {
