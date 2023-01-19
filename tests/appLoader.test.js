@@ -61,12 +61,25 @@ describe('appLoader.test', () => {
     assert.deepEqual(serviceLoader.options.cacheParamsFn, testFunc)
   })
 
-  it('clears all loaders', () => {
-    const appLoader = new AppLoader({ app })
-    appLoader.service('posts')
-    appLoader.service('comments')
-    appLoader.clear()
+  it('clears all loaders', async () => {
+    const appLoader = new AppLoader({
+      app,
+      services: {
+        posts: { cacheMap: new Map() },
+        comments: { cacheMap: new Map() },
+      }
+    })
+    const postsLoader = appLoader.service('posts')
+    const commentsLoader = appLoader.service('comments')
+    await postsLoader.load(1)
+    await commentsLoader.load(1)
+    assert.deepEqual(appLoader.loaders.size, 2)
+    assert.deepEqual(postsLoader.cacheMap.size, 1)
+    assert.deepEqual(commentsLoader.cacheMap.size, 1)
+    await appLoader.clear()
     assert.deepEqual(appLoader.loaders.size, 0)
+    assert.deepEqual(postsLoader.cacheMap.size, 0)
+    assert.deepEqual(commentsLoader.cacheMap.size, 0)
   })
 
   it('takes a base class in global config', () => {

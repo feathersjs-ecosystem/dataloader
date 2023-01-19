@@ -6,7 +6,8 @@ const {
   defaultCacheKeyFn,
   uniqueKeys,
   uniqueResults,
-  uniqueResultsMulti
+  uniqueResultsMulti,
+  CacheMap
 } = require('./utils')
 
 const createDataLoader = ({ service, key, loaderOptions, multi, method, params = {} }) => {
@@ -41,7 +42,7 @@ module.exports = class ServiceLoader {
     cacheMap,
     ...loaderOptions
   }) {
-    this.cacheMap = cacheMap || new Map()
+    this.cacheMap = cacheMap || new CacheMap()
     this.loaders = new Map()
     const service = app.service(serviceName)
     this.options = {
@@ -220,9 +221,17 @@ module.exports = class ServiceLoader {
     })
   }
 
-  clear() {
-    this.cacheMap.clear()
+  async clear() {
+    const { serviceName } = this.options
     this.loaders.clear()
+    const promises = [];
+    for await (const cacheKey of this.cacheMap.keys()) {
+      const parsedKey = JSON.parse(cacheKey)
+      if (parsedKey.serviceName === serviceName) {
+        promises.push(this.cacheMap.delete(cacheKey))
+      }
+    }
+    await Promise.all(promises)
     return this
   }
 }

@@ -101,3 +101,29 @@ module.exports.uniqueResultsMulti = (keys, result, key = 'id', defaultValue = nu
 
   return results
 }
+
+module.exports.CacheMap = class CacheMap {
+  constructor(map) {
+    this.map = map || new Map()
+  }
+
+  async get(key) {
+    return this.map.get(key)
+  }
+
+  async set(key, value) {
+    return this.map.set(key, value)
+  }
+
+  async delete(key) {
+    return this.map.delete(key)
+  }
+
+  async clear() {
+    return this.map.clear()
+  }
+
+  keys() {
+    return this.map.keys()
+  }
+}

@@ -170,15 +170,27 @@ describe('serviceLoader.test', () => {
   })
 
   it('clears', async () => {
-    const serviceLoader = new ServiceLoader({
+    const cacheMap = new Map();
+    const postsLoader = new ServiceLoader({
       app,
       serviceName: 'posts',
+      cacheMap: cacheMap
     })
-    await serviceLoader.load(1)
-    await serviceLoader.get(1)
-    await serviceLoader.find()
-    serviceLoader.clear()
-    assert.deepEqual(serviceLoader.cacheMap.size, 0)
-    assert.deepEqual(serviceLoader.loaders.size, 0)
+    const commentsLoader = new ServiceLoader({
+      app,
+      serviceName: 'comments',
+      cacheMap: cacheMap
+    })
+
+    await commentsLoader.load(1)
+
+    await postsLoader.load(1)
+    await postsLoader.get(1)
+    await postsLoader.find()
+
+    await postsLoader.clear()
+
+    assert.deepEqual(cacheMap.size, 1)
+    assert.deepEqual(postsLoader.loaders.size, 0)
   })
 })
