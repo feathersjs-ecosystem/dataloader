@@ -10,7 +10,7 @@ describe('serviceLoader.test', () => {
   it('creates a serviceLoader', () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     assert.isFunction(serviceLoader.get)
     assert.isFunction(serviceLoader._get)
@@ -48,7 +48,7 @@ describe('serviceLoader.test', () => {
   it('works with load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.load(1)
@@ -58,7 +58,7 @@ describe('serviceLoader.test', () => {
   it('works with load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await Promise.all([app.service('posts').get(1), app.service('posts').get(2)])
     const result = await serviceLoader.load([1, 2])
@@ -68,7 +68,7 @@ describe('serviceLoader.test', () => {
   it('works with key("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body').load('John post')
@@ -78,7 +78,7 @@ describe('serviceLoader.test', () => {
   it('works with key("key")._load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body')._load('John post')
@@ -88,7 +88,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments',
+      serviceName: 'comments'
     })
     const result = await serviceLoader.multi('postId').load(1)
     assert.deepEqual(result.length, 3)
@@ -97,7 +97,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key")._load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments',
+      serviceName: 'comments'
     })
     const result = await serviceLoader.multi('postId')._load(1)
     assert.deepEqual(result.length, 3)
@@ -106,7 +106,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key").load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments',
+      serviceName: 'comments'
     })
     const defaultResult = await Promise.all([
       app.service('comments').find({ paginate: false, query: { postId: 1 } }),
@@ -119,7 +119,7 @@ describe('serviceLoader.test', () => {
   it('works with get', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.get(1)
@@ -129,7 +129,7 @@ describe('serviceLoader.test', () => {
   it('works with find', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const defaultResult = await app.service('posts').find()
     const result = await serviceLoader.find()
@@ -139,7 +139,7 @@ describe('serviceLoader.test', () => {
   it('works with underscored methods', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const methods = ['_get', '_find', '_load']
     let hookCalled = false
@@ -162,7 +162,7 @@ describe('serviceLoader.test', () => {
   it('works with stringifyKey', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      serviceName: 'posts'
     })
     const cacheKey = serviceLoader.stringifyKey({ id: 1, key: 'id' })
     const stableKey = stableStringify({
@@ -174,7 +174,7 @@ describe('serviceLoader.test', () => {
   })
 
   it('clears', async () => {
-    const cacheMap = new Map();
+    const cacheMap = new Map()
     const postsLoader = new ServiceLoader({
       app,
       serviceName: 'posts',

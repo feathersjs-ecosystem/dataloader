@@ -31,7 +31,7 @@ module.exports = class AppLoader {
   }
 
   async clear() {
-    const promises = [];
+    const promises = []
     this.loaders.forEach((loader) => {
       promises.push(loader.cacheMap.clear())
     })

@@ -21,7 +21,7 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params =
   const getResults = multi ? uniqueResultsMulti : uniqueResults
 
   return new DataLoader(async (keys) => {
-    return service[serviceMethod]({
+    const loaderParams = {
       ...params,
       paginate: false,
       query: {
@@ -29,18 +29,14 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params =
         // TODO: Should this be placed in an $and query?
         [key]: { $in: uniqueKeys(keys) }
       }
-    }).then((result) => getResults(keys, result, key))
+    }
+    delete loaderParams.query.$limit
+    return service[serviceMethod](loaderParams).then((result) => getResults(keys, result, key))
   }, loaderOptions)
 }
 
 module.exports = class ServiceLoader {
-  constructor({
-    app,
-    serviceName,
-    cacheParamsFn,
-    cacheMap,
-    ...loaderOptions
-  }) {
+  constructor({ app, serviceName, cacheParamsFn, cacheMap, ...loaderOptions }) {
     this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
     const service = app.service(serviceName)
@@ -66,7 +62,7 @@ module.exports = class ServiceLoader {
       params: null,
       multi: false,
       method: 'load',
-      ...options,
+      ...options
     }
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
@@ -222,7 +218,7 @@ module.exports = class ServiceLoader {
   async clear() {
     const { serviceName } = this.options
     this.loaders.clear()
-    const promises = [];
+    const promises = []
     for await (const cacheKey of this.cacheMap.keys()) {
       const parsedKey = JSON.parse(cacheKey)
       if (parsedKey.serviceName === serviceName) {
