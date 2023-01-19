@@ -89,7 +89,7 @@ The `AppLoader` lazily configures a new `ServiceLoader` per service as you use t
 
 const { ServiceLoader } = require('feathers-dataloader');
 
-const serviceLoader = new ServiceLoader({ service: app.service('users') });
+const serviceLoader = new ServiceLoader({ app, serviceName: 'users' });
 const user = await serviceLoader.load(1, params);
 const user = await serviceLoader.get(1, params);
 const users = await serviceLoader.find(params);
@@ -98,7 +98,7 @@ const user = await serviceLoader._load(1, params);
 const user = await serviceLoader._get(1, params);
 const users = await serviceLoader._find(params);
 
-serviceLoader.clear();
+await serviceLoader.clear();
 ```
 
 The `ServiceLoader` configures a `DataLoader` with some basic options. The `DataLoader` is a powerful batching and caching class that dramatically imporoves performance. It is based on the [facebook/dataloader](https://github.com/facebook/dataloader). If you are interested in how this works in depth, check out this [GREAT VIDEO](https://www.youtube.com/watch?v=OQTnXNCDywA) by its original author.
@@ -130,7 +130,7 @@ Create a new app-loader. This is the most commonly used class.
 
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
-| `app`           | `Object`   |            | A feathers app                                   |
+| `app`           | `Object`   |            | A Feathers app                                   |
 | `services`      |  `Object`  | `{}`| An object where each property is a service name and the value is loader options for that service. These options override the `globalLoaderOptions` |
 | `ServiceLoader`      |  `Class`  | `ServiceLoader`| A base class that will be used to create each ServiceLoader instance |
 | `globalLoaderOptions`           | `Object`   |      {}      | Options that will be assigned to every new `ServiceLoader`                                |
@@ -158,7 +158,7 @@ Create a new app-loader. This is the most commonly used class.
   const user = await loader.get(1, params);
   const users = await loader.find(params);
 
-  loader.clear()
+  await loader.clear()
 ```
 
 <!--- class ServiceLoader --------------------------------------------------------------------------->
@@ -175,7 +175,8 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
-| `service`           | `Object`   |            | A service for this loader. For example, `app.service('users')`                                   |
+| `app`           | `Object`   |            | A Feathers app`                                   |
+| `serviceName`           | `String`   |            | The name of the service like "users"`                                   |
 | `cacheMap`           | `Map`   |            | A Map like object with methods get, set, and clear to serve as the cache of results.`                                   |
 | `cacheParamsFn`           | `Function`   |      defaultCacheParamsFn      | A function that returns a JSON stringifiable set or params to be used in the cacheKey. The default function traverses the params and removes any functions`                                   |
 | `loaderOptions`           | `Object`   |      {}      | See `DataLoader`                           |
@@ -185,7 +186,8 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
   const { ServiceLoader } = require("feathers-dataloader");
 
   const loader = new ServiceLoader({
-    service: app.service('users'),
+    app,
+    serviceName: 'users'
     cacheParamsFn: (params) => {
       return {
         userId: params.user.id,
@@ -209,7 +211,7 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
   const users = await loader._find(params);
   const user = await loader._load(1,params);
 
-  loader.clear()
+  await loader.clear()
 ```
 
 <!--- class DataLoader --------------------------------------------------------------------------->

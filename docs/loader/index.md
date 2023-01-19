@@ -115,7 +115,7 @@ const user = await serviceLoader.load(1, params)
 const user = await serviceLoader.get(1, params)
 const users = await serviceLoader.find(params)
 
-serviceLoader.clearAll()
+await serviceLoader.clear()
 ```
 
 The `ServiceLoader` configures a `DataLoader` with some basic options. The `DataLoader` is a powerful batching and caching class that dramatically imporoves performance. It is based on the [facebook/dataloader](https://github.com/facebook/dataloader). If you are interested in how this works in depth, check out this [GREAT VIDEO](https://www.youtube.com/watch?v=OQTnXNCDywA) by its original author. You should also checkout the GUIDE(./guide.md) for a comprehensive explanation of how the `DataLoader` works.

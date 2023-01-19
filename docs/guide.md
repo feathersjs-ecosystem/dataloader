@@ -101,14 +101,14 @@ const clearLoaderCache = async (context) => {
   const { loader } = context.params;
 
   // Clear this service's cache
-  loader.service('posts').clear();
+  await loader.service('users').clear();
 
   // This update may have affected other services too.
   // If you know what services were changed you can clear them.
-  loader.service('posts').clear();
+  await loader.service('posts').clear();
 
   // Or you can clear all services at once
-  loader.clear();
+  await loader.clear();
 
   return context;
 };

@@ -25,7 +25,7 @@ Create a new app-loader. This is the most commonly-used class.
 - **options** `{Object}`
   - **app** `{Object}` - a Feathers app
   - **services** `{Object}` - An object where each property is a service name and the value is loader options for that service. These options override the `globalLoaderOptions`. Defaults to `{}`
-  - **globalLoaderOptions** `{Object}` - Options that will be assigned to every new `ServiceLoader`. Defaults to `{}`
+  - **...globalLoaderOptions** `{Object}` - Any additional options will be assigned to every new `ServiceLoader`.
 
 ### AppLoader Example
 
@@ -52,7 +52,7 @@ const usersByRole = await loader.multi('role').load(['author', 'reader'], params
 const user = await loader.get(1, params)
 const users = await loader.find(params)
 
-loader.clearAll()
+await loader.clear()
 ```
 
 ### AppLoader Instances

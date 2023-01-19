@@ -29,8 +29,11 @@ TODO: Provide Links to the DataLoader and FindLoader options.
 **Arguments:**
 
 - **options** `{Object}`
-  - **service** `{Object}` - A service for this loader, like `app.service('users')`
-  - **loaderOptions** `{Object}` - See `DataLoader`, `FindLoader` and `GetLoader`
+  - **app** `{Object}` - A Feathers app,
+  - **serviceName** `{String}` - The name of the service
+  - **cacheMap** `{Object}` - Instance of Map (or an object with a similar API) to be used as cache. Defaults to `new Map()`
+  - **cacheParamsFn** `{Function}` - A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and removes any non-serializable items. The default function returns traverses params and removes any functions. Defaults to `defaultCacheParamsFn`
+  - **cacheKeyFn** `{Function}` - Normalize keys. `(key) => key && key.toString ? key.toString() : String(key)` Defaults to `defaultCacheKeyFn`
 
 There are two ways to create `ServiceLoader` instances.
 
@@ -55,7 +58,7 @@ You can also directly create an instance using the `ServiceLoader` class.
 const { ServiceLoader } = require('@feathersjs/loader')
 
 // This is our ServiceLoader instance
-const userLoader = new ServiceLoader({ service: app.service('users') })
+const userLoader = new ServiceLoader({ app, serviceName: 'users' })
 ```
 
 ## Example
@@ -67,7 +70,8 @@ const { ServiceLoader } = require('@feathersjs/loader')
 const loaderOptions = {}
 
 const loader = new ServiceLoader({
-  service: app.service('users'),
+  app
+  serviceName: 'users',
   ...loaderOptions
 })
 
@@ -84,7 +88,7 @@ const usersByRole = await loader.multi('role').load(['author', 'reader'], params
 const user = await loader.get(1, params)
 const users = await loader.find(params)
 
-loader.clearAll()
+await loader.clear()
 ```
 
 ## Instances
@@ -93,7 +97,7 @@ Each `ServiceLoader` instance provides the several methods for handling data. Th
 
 - The [Chainable Loader Methods](#chainable-loader-methods): `load`, `key`, and `multi`.
 - The [Configurable Loader Method](#configurable-loader-method): `exec`.
-- The [Cache Loader Methods](#cache-loader-methods): `find`, `get`, and `clearAll`.
+- The [Get and Find Methods](#cache-loader-methods): `find`, `get`, and `clear`.
 
 ### Chainable Loader Methods
 
@@ -115,13 +119,15 @@ This method is similar to the chainable methods in that it performs query/relati
     - **params** `{ServiceParams}` - additional params to provide to the underlying Feathers service.
     - **cacheParamsFn** `() => ?` **//TODO fill in cacheParamsFn**
 
-### Cache Loader Methods
+### Get and Find Methods
 
 The `find` and `get` methods work similar to `service.find` and `service.get` and also perform result caching. They do not perform query/relationship batching.
 
-- **find** `(params) => Promise<Data>` - makes a request with the underlying `FindLoader` instance and caches the result. This is the same as calling `findLoader.load`
-- **get** `(id, params) => Promise<Data>` - makes a request with the underlying `GetLoader` instance and caches the result. This is the same as calling `getLoader.load`
-- **clearAll** `(id | id[]) => self` - clears the internal cache map.
+- **find** `(params) => Promise<Data>` - makes a request with the underlying service's `find` method and caches the results.
+- **_find** `(params) => Promise<Data>` - makes a request with the underlying service's `_find` method and caches the results.
+- **get** `(id, params) => Promise<Data>` - makes a request with the underlying service's `get` method and caches the results.
+- **_get** `(id, params) => Promise<Data>` - makes a request with the underlying service's `_get` method and caches the results.
+- **clear** `() => self` - clears the internal cache map.
 
 ## Loading on a Custom Key
 

@@ -16,6 +16,35 @@ These docs are incomplete. Feel free to review with the understanding that they 
 
 </BlockQuote>
 
+## class CacheMap(...)
+
+**class CacheMap(map)**
+
+This library re-exports [Dataloader](https://www.npmjs.com/package/dataloader) from its original package. Refer to [its documentation](https://github.com/graphql/dataloader) for more information. The `loaderOptions` given to `BatchLoader` will be used to configure DataLoaders. You can also import `Dataloader` along with some helpful utility functions to build custom loaders.
+
+```js
+const { DataLoader uniqueResults, uniqueKeys } = require("@feathersjs/loader");
+
+const batchFn = async (keys, context) => {
+  const data = await users.find({
+    query: { id: { $in: uniqueKeys(keys) } },
+    paginate: false,
+  });
+  return uniqueResults(keys, data);
+}
+
+const usersLoader = new DataLoader(
+  batchFn,
+  {
+    batch: true,
+    cache: true,
+    maxBatchSize: 100,
+    cacheKeyFn: (key) => key,
+    cacheMap: new Map()
+  }
+);
+```
+
 ## class DataLoader(...)
 
 **class DataLoader(batchLoadFunc [, options])**

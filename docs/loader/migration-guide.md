@@ -10,15 +10,10 @@ Read more about populating with data loaders, [here](#populating-with-loaders).
 
 ## Data Loaders
 
-Feathers Dove introduces memorable new APIs for batch-loading and caching. And for the first time, Feathers has a built-in solution for populating data: Cache Loaders, App Loaders, and Service Loaders!
+Feathers Dove introduces memorable new APIs for batch-loading and caching. And for the first time, Feathers has a built-in solution for populating data: App Loaders and Service Loaders!
 
 You can learn more about Data Loaders, [here](/api/loader/index).
 
-### Cache Loaders
-
-Speed is the goal. Cache Loaders make your apps one step faster by preventing the need to re-request data. Cache Loaders have a familiar API for making requests and caching the results of those requests. The Cache Loaders include the `FindLoader`, the `GetLoader`, and the `find` and `get` methods of the new `ServiceLoader` classes.
-
-Learn more about Cache Loaders, [here](/api/loader/cache-loaders).
 
 ### Service Loaders
 
