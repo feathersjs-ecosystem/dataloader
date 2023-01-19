@@ -22,7 +22,7 @@ const initializeLoader = async (context, next) => {
 
   const loader = new AppLoader({ app: context.app });
 
-  asyncLocalStorage.run({ loader }, async () => {
+  return asyncLocalStorage.run({ loader }, async () => {
     context.params.loader = loader;
     return next();
   });
