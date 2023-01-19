@@ -21,8 +21,8 @@ module.exports = class AppLoader {
 
     const loader = new ServiceLoader({
       ...loaderOptions,
-      name: serviceName,
-      service: app.service(serviceName)
+      serviceName,
+      app
     })
 
     this.loaders.set(serviceName, loader)

@@ -34,11 +34,19 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params =
 }
 
 module.exports = class ServiceLoader {
-  constructor({ service, name, cacheParamsFn, cacheMap, ...loaderOptions }) {
+  constructor({
+    app,
+    serviceName,
+    cacheParamsFn,
+    cacheMap,
+    ...loaderOptions
+  }) {
     this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
+    const service = app.service(serviceName)
     this.options = {
-      name,
+      app,
+      serviceName,
       service,
       key: service.options.id,
       cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
@@ -50,7 +58,7 @@ module.exports = class ServiceLoader {
   }
 
   async exec({ cacheParamsFn, ...options }) {
-    const { service, name, loaderOptions } = this.options
+    const { service, serviceName, loaderOptions } = this.options
 
     options = {
       id: null,
@@ -59,7 +67,7 @@ module.exports = class ServiceLoader {
       multi: false,
       method: 'load',
       ...options,
-      service: name
+      serviceName
     }
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
@@ -106,7 +114,7 @@ module.exports = class ServiceLoader {
         multi: options.multi,
         method: options.method,
         params: options.params,
-        service: name
+        serviceName
       },
       cacheParamsFn
     )
