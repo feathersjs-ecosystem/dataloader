@@ -66,7 +66,7 @@ describe('appLoader.test', () => {
       app,
       services: {
         posts: { cacheMap: new Map() },
-        comments: { cacheMap: new Map() },
+        comments: { cacheMap: new Map() }
       }
     })
     const postsLoader = appLoader.service('posts')

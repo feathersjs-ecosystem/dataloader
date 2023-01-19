@@ -121,4 +121,3 @@ module.exports.uniqueResultsMulti = (keys, result, key = 'id', defaultValue = nu
 
   return results
 }
-
