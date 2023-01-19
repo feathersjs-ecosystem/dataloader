@@ -66,7 +66,7 @@ const userLoader = new ServiceLoader({ app, serviceName: 'users' })
 ```js
 const { ServiceLoader } = require('@feathersjs/loader')
 
-// See DataLoader and FindLoader options
+// See DataLoader options
 const loaderOptions = {}
 
 const loader = new ServiceLoader({

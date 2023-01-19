@@ -120,24 +120,6 @@ app.service('posts').hooks({
 });
 ```
 
-But, you can get access to the underlying caches as well. You should use this with caution...cache invalidation is hard. If you are considering doing this, it may be best to use `DataLoader` classes directly so you can better control each loader.
-
-```js
-const clearLoaderCache = async (context) => {
-  const loader = context.params.loader.service('users');
-  loader.cacheMap.forEach((result, key) => {
-    // Write code that will break your app...
-  });
-  return context;
-};
-
-app.service('posts').hooks({
-  after: {
-    all: [clearLoaderCache]
-  }
-});
-```
-
 ## Use a `maxBatchSize`
 
 The ServiceLoader's underlying DataLoader takes a `maxBatchSize` option. This option limits the number of ids in the `$in` query. Huge arrays of ids can lead to performance issues and even database lockup. By using the `maxBatchSize` you can break those queries into smaller ones. You should monitor your own application to determine the best number to use for your batch size, but setting some maximum is recommended.
