@@ -116,6 +116,17 @@ describe('serviceLoader.test', () => {
     assert.deepEqual(result, defaultResult)
   })
 
+  it('works with select("key").load(1)', async () => {
+    const serviceLoader = new ServiceLoader({
+      app,
+      serviceName: 'posts',
+    })
+    const defaultResult = await serviceLoader.load(1)
+    const selectedResult = await serviceLoader.select(['body']).load(1)
+
+    console.log({ defaultResult, selectedResult })
+  })
+
   it('works with get', async () => {
     const serviceLoader = new ServiceLoader({
       app,

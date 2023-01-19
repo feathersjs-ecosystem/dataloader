@@ -48,6 +48,16 @@ module.exports.defaultCacheKeyFn = (id) => {
   return id.toString ? id.toString() : String(id)
 }
 
+module.exports.defaultSelectFn = (selection, source) => {
+  return selection.reduce((result, key) => {
+    if (source[key] !== undefined) {
+      result[key] = source[key]
+    }
+
+    return result
+  }, {})
+}
+
 module.exports.uniqueKeys = (keys) => {
   const found = {}
   const unique = []

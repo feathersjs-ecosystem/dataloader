@@ -4,6 +4,7 @@ const {
   stableStringify,
   defaultCacheParamsFn,
   defaultCacheKeyFn,
+  defaultSelectFn,
   uniqueKeys,
   uniqueResults,
   uniqueResultsMulti
@@ -38,6 +39,7 @@ module.exports = class ServiceLoader {
     app,
     serviceName,
     cacheParamsFn,
+    selectFn,
     cacheMap,
     ...loaderOptions
   }) {
@@ -49,6 +51,7 @@ module.exports = class ServiceLoader {
       serviceName,
       service,
       key: service.options.id,
+      selectFn: selectFn || defaultSelectFn,
       cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
       loaderOptions: {
         cacheKeyFn: defaultCacheKeyFn,
@@ -164,51 +167,15 @@ module.exports = class ServiceLoader {
   }
 
   key(key) {
-    return {
-      load: (id, params, cacheParamsFn) => {
-        return this.exec({
-          method: 'load',
-          id,
-          key,
-          params,
-          cacheParamsFn
-        })
-      },
-      _load: (id, params, cacheParamsFn) => {
-        return this.exec({
-          method: '_load',
-          id,
-          key,
-          params,
-          cacheParamsFn
-        })
-      }
-    }
+    return new ChainedLoader({ loader: this, key });
   }
 
   multi(key) {
-    return {
-      load: (id, params, cacheParamsFn) => {
-        return this.exec({
-          method: 'load',
-          id,
-          key,
-          params,
-          cacheParamsFn,
-          multi: true
-        })
-      },
-      _load: (id, params, cacheParamsFn) => {
-        return this.exec({
-          method: '_load',
-          id,
-          key,
-          params,
-          cacheParamsFn,
-          multi: true
-        })
-      }
-    }
+    return new ChainedLoader({ loader: this, key, multi: true });
+  }
+
+  select(selection) {
+    return new ChainedLoader({ loader: this, selection });
   }
 
   stringifyKey(options, cacheParamsFn = this.options.cacheParamsFn) {
@@ -231,5 +198,93 @@ module.exports = class ServiceLoader {
     }
     await Promise.all(promises)
     return this
+  }
+}
+
+class ChainedLoader {
+  constructor({ loader, key, selection, multi }) {
+    this.loader = loader;
+    this.options = { loader, key, selection, multi }
+  }
+
+  key(key) {
+    this.options = {
+      ...this.options,
+      key,
+      multi: false
+    }
+    return this;
+  }
+
+  multi(key) {
+    this.options = {
+      ...this.options,
+      key,
+      multi: true
+    }
+    return this;
+  }
+
+  select(selection) {
+    this.options = {
+      ...this.options,
+      selection
+    }
+    return this;
+  }
+
+  _process(result) {
+    const { selection } = this.options;
+    const { selectFn, key }  = this.loader.options;
+    if (selection) {
+      result = Array.isArray(result)
+        ? result.map(item => selectFn([key, ...selection], item))
+        : selectFn([key, ...selection], result)
+    }
+    return result
+  }
+
+  async get(id, params, cacheParamsFn) {
+    const result = await this.loader.get(id, params, cacheParamsFn)
+    return this._process(result)
+  }
+
+  async _get(id, params, cacheParamsFn) {
+    const result = await this.loader._get(id, params, cacheParamsFn)
+    return this._process(result)
+  }
+
+  async find(params, cacheParamsFn) {
+    const result = await this.loader.find(params, cacheParamsFn)
+    return this._process(result)
+  }
+
+  async _find(params, cacheParamsFn) {
+    const result = await this.loader._find(params, cacheParamsFn)
+    return this._process(result)
+  }
+
+  async load(id, params, cacheParamsFn) {
+    const result = await this.loader.exec({
+      id,
+      params,
+      cacheParamsFn,
+      method: 'load',
+      key: this.options.key,
+      multi: this.options.multi
+    })
+    return this._process(result)
+  }
+
+  async _load(id, params, cacheParamsFn) {
+    const result = await this.loader.exec({
+      id,
+      params,
+      cacheParamsFn,
+      method: '_load',
+      key: this.options.key,
+      multi: this.options.multi
+    })
+    return this._process(result)
   }
 }
