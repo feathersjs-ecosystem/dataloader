@@ -122,6 +122,7 @@ describe('serviceLoader.test', () => {
       app,
       service: 'posts'
     })
+    const mainResult = await app.service('posts').get(1)
     const defaultResult = await serviceLoader.load(1)
     const selectedResult = await serviceLoader.select(['body']).load(1)
 
@@ -129,6 +130,7 @@ describe('serviceLoader.test', () => {
       id: defaultResult.id,
       body: defaultResult.body
     })
+    assert.deepEqual(mainResult, defaultResult)
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 
@@ -137,6 +139,7 @@ describe('serviceLoader.test', () => {
       app,
       service: 'posts'
     })
+    const mainResult = await app.service('posts').get(1)
     const defaultResult = await serviceLoader.get(1)
     const selectedResult = await serviceLoader.select(['body']).get(1)
 
@@ -144,6 +147,7 @@ describe('serviceLoader.test', () => {
       id: defaultResult.id,
       body: defaultResult.body
     })
+    assert.deepEqual(mainResult, defaultResult)
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 
@@ -152,8 +156,10 @@ describe('serviceLoader.test', () => {
       app,
       service: 'posts'
     })
+    const mainResult = await app.service('posts').find()
     const defaultResult = await serviceLoader.find()
     const selectedResult = await serviceLoader.select(['body']).find()
+
     assert.deepEqual(
       selectedResult,
       defaultResult.map((result) => {
@@ -163,6 +169,7 @@ describe('serviceLoader.test', () => {
         }
       })
     )
+    assert.deepEqual(mainResult, defaultResult)
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 
@@ -171,8 +178,16 @@ describe('serviceLoader.test', () => {
       app,
       service: 'posts'
     })
+    const mainResult = await app.service('posts').find({
+      paginate: false,
+      query: {
+        id: { $in: [1, 2] },
+        $sort: { id: 1 }
+      }
+    })
     const defaultResult = await serviceLoader.load([1, 2])
     const selectedResult = await serviceLoader.select(['body']).load([1, 2])
+
     assert.deepEqual(
       selectedResult,
       defaultResult.map((result) => {
@@ -182,6 +197,7 @@ describe('serviceLoader.test', () => {
         }
       })
     )
+    assert.deepEqual(mainResult, defaultResult)
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 
@@ -190,8 +206,18 @@ describe('serviceLoader.test', () => {
       app,
       service: 'comments'
     })
+    const result1 = await app.service('comments').find({
+      paginate: false,
+      query: { postId: 1 }
+    })
+    const result2 = await app.service('comments').find({
+      paginate: false,
+      query: { postId: 2 }
+    })
+    const mainResult = [result1, result2]
     const defaultResult = await serviceLoader.multi('postId').load([1, 2])
     const selectedResult = await serviceLoader.multi('postId').select(['text']).load([1, 2])
+
     assert.deepEqual(
       selectedResult,
       defaultResult.map((result) => {
@@ -203,6 +229,7 @@ describe('serviceLoader.test', () => {
         })
       })
     )
+    assert.deepEqual(mainResult, defaultResult)
     assert.deepEqual(serviceLoader.cacheMap.size, 1)
   })
 

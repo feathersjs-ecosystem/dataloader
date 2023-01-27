@@ -62,7 +62,7 @@ module.exports.defaultSelectFn = (selection, result, options) => {
     throw new Error('selection must be an array')
   }
 
-  const { key, method } = options
+  const { key, method, multi } = options
 
   const convertResult = (result) => {
     return select([key, ...selection], result)
@@ -75,10 +75,14 @@ module.exports.defaultSelectFn = (selection, result, options) => {
     }
   }
 
-  if (Array.isArray(result)) {
+  if (multi) {
     return result.map((result) => {
-      return Array.isArray(result) ? result.map(convertResult) : convertResult(result)
+      return result.map(convertResult)
     })
+  }
+
+  if (Array.isArray(result)) {
+    return result.map(convertResult)
   }
 
   return convertResult(result)
