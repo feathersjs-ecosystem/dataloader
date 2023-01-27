@@ -11,10 +11,10 @@ const {
   assign
 } = require('./utils')
 
-const createDataLoader = ({ service, key, loaderOptions, multi, method, params }) => {
+const createDataLoader = ({ appService, key, loaderOptions, multi, method, params }) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
 
-  if (!service[serviceMethod]) {
+  if (!appService[serviceMethod]) {
     throw new GeneralError(
       `Cannot create a loader for a service that does not have a ${serviceMethod} method.`
     )
@@ -33,7 +33,7 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params }
       }
     }
     delete loaderParams.query.$limit
-    return service[serviceMethod](loaderParams).then((result) => getResults(keys, result, key))
+    return appService[serviceMethod](loaderParams).then((result) => getResults(keys, result, key))
   }, loaderOptions)
 }
 
@@ -45,15 +45,15 @@ const stringifyKey = (options, cacheParamsFn) => {
 }
 
 module.exports = class ServiceLoader {
-  constructor({ app, serviceName, cacheParamsFn, selectFn, cacheMap, ...loaderOptions }) {
+  constructor({ app, service, cacheParamsFn, selectFn, cacheMap, ...loaderOptions }) {
     this.cacheMap = cacheMap || new Map()
     this.loaders = new Map()
-    const service = app.service(serviceName)
+    const appService = app.service(service)
     this.options = {
       app,
-      serviceName,
       service,
-      key: service.options.id,
+      appService,
+      key: appService.options.id,
       selectFn: selectFn || defaultSelectFn,
       cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
       loaderOptions: assign({ cacheKeyFn: defaultCacheKeyFn }, loaderOptions)
@@ -61,7 +61,8 @@ module.exports = class ServiceLoader {
   }
 
   async exec({ cacheParamsFn, ...options }) {
-    const { service, loaderOptions } = this.options
+    const { appService, loaderOptions, service } = this.options
+    cacheParamsFn = cacheParamsFn || this.options.cacheParamsFn
 
     options = assign(
       {
@@ -71,7 +72,10 @@ module.exports = class ServiceLoader {
         multi: false,
         method: 'load'
       },
-      options
+      {
+        ...options,
+        service
+      }
     )
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
@@ -84,8 +88,8 @@ module.exports = class ServiceLoader {
       }
 
       const result = ['get', '_get'].includes(options.method)
-        ? await service[options.method](options.id, options.params)
-        : await service[options.method](options.params)
+        ? await appService[options.method](options.id, options.params)
+        : await appService[options.method](options.params)
 
       await this.cacheMap.set(cacheKey, result)
 
@@ -112,25 +116,21 @@ module.exports = class ServiceLoader {
       return cachedResult
     }
 
-    const loaderKey = stringifyKey(
-      {
-        key: options.key,
-        multi: options.multi,
-        method: options.method,
-        params: options.params
-      },
-      cacheParamsFn
-    )
+    const loaderConfig = {
+      key: options.key,
+      multi: options.multi,
+      method: options.method,
+      params: options.params
+    }
+
+    const loaderKey = stringifyKey(loaderConfig, cacheParamsFn)
 
     const dataLoader =
       this.loaders.get(loaderKey) ||
       createDataLoader({
-        key: options.key,
-        multi: options.multi,
-        method: options.method,
-        params: options.params,
-        service,
-        loaderOptions
+        appService,
+        loaderOptions,
+        ...loaderConfig
       })
 
     this.loaders.set(loaderKey, dataLoader)
@@ -185,7 +185,7 @@ module.exports = class ServiceLoader {
   }
 
   async clear() {
-    const { serviceName } = this.options
+    const { service } = this.options
     this.loaders.clear()
     const promises = []
     // TODO: This could be a redis store or some other
@@ -196,7 +196,7 @@ module.exports = class ServiceLoader {
     // the delete in the iteration. But that would be slower.
     for await (const cacheKey of this.cacheMap.keys()) {
       const parsedKey = JSON.parse(cacheKey)
-      if (parsedKey.serviceName === serviceName) {
+      if (parsedKey.service === service) {
         promises.push(this.cacheMap.delete(cacheKey))
       }
     }
@@ -207,74 +207,70 @@ module.exports = class ServiceLoader {
 
 class ChainedLoader {
   constructor(loader, options) {
-    this.loader = loader
-    this.options = options
+    this.options = { ...options, loader }
   }
 
   key(key) {
-    this.options = assign(this.options, { key, multi: false })
-    return this
+    return this.set({ key, multi: false })
   }
 
   multi(key) {
-    this.options = assign(this.options, { key, multi: true })
-    return this
+    return this.set({ key, multi: true })
   }
 
   select(selection) {
-    this.options = assign(this.options, { selection })
-    return this
+    return this.set({ selection })
   }
 
   params(cacheParamsFn) {
-    this.options = assign(this.options, { cacheParamsFn })
+    return this.set({ cacheParamsFn })
+  }
+
+  async get(id, params) {
+    return this.set({ method: 'get', id, params }).exec()
+  }
+
+  async _get(id, params) {
+    return this.set({ method: '_get', id, params }).exec()
+  }
+
+  async find(params) {
+    return this.set({ method: 'find', params }).exec()
+  }
+
+  async _find(params) {
+    return this.set({ method: '_find', params }).exec()
+  }
+
+  async load(id, params) {
+    return this.set({ method: 'load', id, params }).exec()
+  }
+
+  async _load(id, params) {
+    return this.set({ method: '_load', id, params }).exec()
+  }
+
+  set(options) {
+    this.options = assign(this.options, options)
     return this
   }
 
   async handleResult(result) {
     const { selection } = this.options
-    const { selectFn } = this.loader.options
+    const { selectFn } = this.options.loader.options
 
     if (!result || !selection) {
       return result
     }
 
-    return await selectFn(selection, result, this)
+    return await selectFn(selection, result, this.options)
   }
 
-  async get(id, params) {
-    this.options = assign(this.options, { method: 'get' })
-    const result = await this.loader.exec({ ...this.options, id, params })
-    return this.handleResult(result)
-  }
-
-  async _get(id, params) {
-    this.options = assign(this.options, { method: '_get' })
-    const result = await this.loader.exec({ ...this.options, id, params })
-    return this.handleResult(result)
-  }
-
-  async find(params) {
-    this.options = assign(this.options, { method: 'find' })
-    const result = await this.loader.exec({ ...this.options, params })
-    return this.handleResult(result)
-  }
-
-  async _find(params) {
-    this.options = assign(this.options, { method: '_find' })
-    const result = await this.loader.exec({ ...this.options, id, params })
-    return this.handleResult(result)
-  }
-
-  async load(id, params) {
-    this.options = assign(this.options, { method: 'load' })
-    const result = await this.loader.exec({ ...this.options, id, params })
-    return this.handleResult(result)
-  }
-
-  async _load(id, params) {
-    this.options = assign(this.options, { method: '_load' })
-    const result = await this.loader.exec({ ...this.options, id, params })
+  async exec() {
+    const options = { ...this.options }
+    delete options.selection
+    delete options.loader
+    const result = await this.options.loader.exec(options)
     return this.handleResult(result)
   }
 }

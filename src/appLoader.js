@@ -6,14 +6,14 @@ module.exports = class AppLoader {
     this.loaders = new Map()
   }
 
-  service(serviceName) {
+  service(path) {
     const { app } = this.options
     const { ServiceLoader, ...loaderOptions } = {
       ServiceLoader: BaseServiceLoader,
       ...this.options.loaderOptions,
-      ...(this.options.services[serviceName] || {})
+      ...(this.options.services[path] || {})
     }
-    const cachedLoader = this.loaders.get(serviceName)
+    const cachedLoader = this.loaders.get(path)
 
     if (cachedLoader) {
       return cachedLoader
@@ -21,11 +21,11 @@ module.exports = class AppLoader {
 
     const loader = new ServiceLoader({
       ...loaderOptions,
-      serviceName,
+      service: path,
       app
     })
 
-    this.loaders.set(serviceName, loader)
+    this.loaders.set(path, loader)
 
     return loader
   }

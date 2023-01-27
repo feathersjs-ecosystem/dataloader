@@ -10,7 +10,7 @@ describe('serviceLoader.test', () => {
   it('creates a serviceLoader', () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     assert.isFunction(serviceLoader.get)
     assert.isFunction(serviceLoader._get)
@@ -18,17 +18,18 @@ describe('serviceLoader.test', () => {
     assert.isFunction(serviceLoader._find)
     assert.isFunction(serviceLoader.load)
     assert.isFunction(serviceLoader._load)
-    assert.isFunction(serviceLoader.multi)
     assert.isFunction(serviceLoader.key)
+    assert.isFunction(serviceLoader.select)
+    assert.isFunction(serviceLoader.params)
+    assert.isFunction(serviceLoader.multi)
     assert.isFunction(serviceLoader.exec)
     assert.isFunction(serviceLoader.clear)
-    assert.isFunction(serviceLoader.stringifyKey)
   })
 
   it('takes a cacheParamsFn option', () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      service: 'posts',
       cacheParamsFn: testFunc
     })
     assert.deepEqual(serviceLoader.options.cacheParamsFn, testFunc)
@@ -37,7 +38,7 @@ describe('serviceLoader.test', () => {
   it('passes loader options', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      service: 'posts',
       cacheKeyFn: testFunc
     })
     await serviceLoader.load(1)
@@ -48,7 +49,7 @@ describe('serviceLoader.test', () => {
   it('works with load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.load(1)
@@ -58,7 +59,7 @@ describe('serviceLoader.test', () => {
   it('works with load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await Promise.all([app.service('posts').get(1), app.service('posts').get(2)])
     const result = await serviceLoader.load([1, 2])
@@ -68,7 +69,7 @@ describe('serviceLoader.test', () => {
   it('works with key("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body').load('John post')
@@ -78,7 +79,7 @@ describe('serviceLoader.test', () => {
   it('works with key("key")._load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body')._load('John post')
@@ -88,7 +89,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments'
+      service: 'comments'
     })
     const result = await serviceLoader.multi('postId').load(1)
     assert.deepEqual(result.length, 3)
@@ -97,7 +98,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key")._load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments'
+      service: 'comments'
     })
     const result = await serviceLoader.multi('postId')._load(1)
     assert.deepEqual(result.length, 3)
@@ -106,7 +107,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key").load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments'
+      service: 'comments'
     })
     const defaultResult = await Promise.all([
       app.service('comments').find({ paginate: false, query: { postId: 1 } }),
@@ -119,7 +120,7 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).load()', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await serviceLoader.load(1)
     const selectedResult = await serviceLoader.select(['body']).load(1)
@@ -134,7 +135,7 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).get()', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await serviceLoader.get(1)
     const selectedResult = await serviceLoader.select(['body']).get(1)
@@ -149,7 +150,7 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).find()', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await serviceLoader.find()
     const selectedResult = await serviceLoader.select(['body']).find()
@@ -168,7 +169,7 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await serviceLoader.load([1, 2])
     const selectedResult = await serviceLoader.select(['body']).load([1, 2])
@@ -187,16 +188,16 @@ describe('serviceLoader.test', () => {
   it('works with select(selection).multi(key).load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'comments'
+      service: 'comments'
     })
     const defaultResult = await serviceLoader.multi('postId').load([1, 2])
-    const selectedResult = await serviceLoader.select(['text']).multi('postId').load([1, 2])
+    const selectedResult = await serviceLoader.multi('postId').select(['text']).load([1, 2])
     assert.deepEqual(
       selectedResult,
       defaultResult.map((result) => {
         return result.map((result) => {
           return {
-            id: result.id,
+            postId: result.postId,
             text: result.text
           }
         })
@@ -208,7 +209,7 @@ describe('serviceLoader.test', () => {
   it('works with get', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.get(1)
@@ -218,7 +219,7 @@ describe('serviceLoader.test', () => {
   it('works with find', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const defaultResult = await app.service('posts').find()
     const result = await serviceLoader.find()
@@ -228,7 +229,7 @@ describe('serviceLoader.test', () => {
   it('works with underscored methods', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      serviceName: 'posts'
+      service: 'posts'
     })
     const methods = ['_get', '_find', '_load']
     let hookCalled = false
@@ -247,30 +248,16 @@ describe('serviceLoader.test', () => {
     assert.deepEqual(hookCalled, false)
   })
 
-  it('works with stringifyKey', async () => {
-    const serviceLoader = new ServiceLoader({
-      app,
-      serviceName: 'posts'
-    })
-    const cacheKey = serviceLoader.stringifyKey({ id: 1, key: 'id' })
-    const stableKey = stableStringify({
-      serviceName: 'posts',
-      id: 1,
-      key: 'id'
-    })
-    assert.deepEqual(cacheKey, stableKey)
-  })
-
   it('clears', async () => {
     const cacheMap = new Map()
     const postsLoader = new ServiceLoader({
       app,
-      serviceName: 'posts',
+      service: 'posts',
       cacheMap: cacheMap
     })
     const commentsLoader = new ServiceLoader({
       app,
-      serviceName: 'comments',
+      service: 'comments',
       cacheMap: cacheMap
     })
 

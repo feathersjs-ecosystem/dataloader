@@ -57,12 +57,12 @@ const select = (selection, source) => {
   }, {})
 }
 
-module.exports.defaultSelectFn = (selection, result, chainedLoader) => {
+module.exports.defaultSelectFn = (selection, result, options) => {
   if (!Array.isArray(selection)) {
     throw new Error('selection must be an array')
   }
 
-  const { key, method } = chainedLoader.options
+  const { key, method } = options
 
   const convertResult = (result) => {
     return select([key, ...selection], result)
