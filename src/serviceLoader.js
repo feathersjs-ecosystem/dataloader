@@ -37,7 +37,7 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params }
   }, loaderOptions)
 }
 
-const stringifyKey =(options, cacheParamsFn) =>{
+const stringifyKey = (options, cacheParamsFn) => {
   return stableStringify({
     ...options,
     params: cacheParamsFn(options.params)
