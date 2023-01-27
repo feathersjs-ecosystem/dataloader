@@ -37,6 +37,13 @@ const createDataLoader = ({ service, key, loaderOptions, multi, method, params }
   }, loaderOptions)
 }
 
+const stringifyKey =(options, cacheParamsFn) =>{
+  return stableStringify({
+    ...options,
+    params: cacheParamsFn(options.params)
+  })
+}
+
 module.exports = class ServiceLoader {
   constructor({ app, serviceName, cacheParamsFn, selectFn, cacheMap, ...loaderOptions }) {
     this.cacheMap = cacheMap || new Map()
@@ -68,7 +75,7 @@ module.exports = class ServiceLoader {
     )
 
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
-      const cacheKey = this.stringifyKey(options, cacheParamsFn)
+      const cacheKey = stringifyKey(options, cacheParamsFn)
 
       const cachedResult = await this.cacheMap.get(cacheKey)
 
@@ -91,7 +98,7 @@ module.exports = class ServiceLoader {
     // does to the cache key, thats why these are sorted.
     const sortedId = Array.isArray(options.id) ? [...options.id].sort() : options.id
 
-    const cacheKey = this.stringifyKey(
+    const cacheKey = stringifyKey(
       {
         ...options,
         id: sortedId
@@ -105,7 +112,7 @@ module.exports = class ServiceLoader {
       return cachedResult
     }
 
-    const loaderKey = this.stringifyKey(
+    const loaderKey = stringifyKey(
       {
         key: options.key,
         multi: options.multi,
@@ -137,28 +144,28 @@ module.exports = class ServiceLoader {
     return result
   }
 
-  get(id, params, cacheParamsFn) {
-    return this.exec({ method: 'get', id, params, cacheParamsFn })
+  get(id, params) {
+    return this.exec({ method: 'get', id, params })
   }
 
-  _get(id, params, cacheParamsFn) {
-    return this.exec({ method: '_get', id, params, cacheParamsFn })
+  _get(id, params) {
+    return this.exec({ method: '_get', id, params })
   }
 
-  find(params, cacheParamsFn) {
-    return this.exec({ method: 'find', params, cacheParamsFn })
+  find(params) {
+    return this.exec({ method: 'find', params })
   }
 
-  _find(params, cacheParamsFn) {
-    return this.exec({ method: '_find', params, cacheParamsFn })
+  _find(params) {
+    return this.exec({ method: '_find', params })
   }
 
-  load(id, params, cacheParamsFn) {
-    return this.exec({ method: 'load', id, params, cacheParamsFn })
+  load(id, params) {
+    return this.exec({ method: 'load', id, params })
   }
 
-  _load(id, params, cacheParamsFn) {
-    return this.exec({ method: '_load', id, params, cacheParamsFn })
+  _load(id, params) {
+    return this.exec({ method: '_load', id, params })
   }
 
   key(key) {
@@ -173,18 +180,20 @@ module.exports = class ServiceLoader {
     return new ChainedLoader(this, { key: this.options.key, selection })
   }
 
-  stringifyKey(options, cacheParamsFn = this.options.cacheParamsFn) {
-    return stableStringify({
-      ...options,
-      serviceName: this.options.serviceName,
-      params: cacheParamsFn(options.params)
-    })
+  params(cacheParamsFn) {
+    return new ChainedLoader(this, { key: this.options.key, cacheParamsFn })
   }
 
   async clear() {
     const { serviceName } = this.options
     this.loaders.clear()
     const promises = []
+    // TODO: This could be a redis store or some other
+    // async storage. That's why there is this for/await
+    // iterator used to step over all the keys in a collection.
+    // Is it a good idea to just be pushing all the deletes into
+    // one Promise.all() after? Instead, we may want to call
+    // the delete in the iteration. But that would be slower.
     for await (const cacheKey of this.cacheMap.keys()) {
       const parsedKey = JSON.parse(cacheKey)
       if (parsedKey.serviceName === serviceName) {
@@ -217,75 +226,55 @@ class ChainedLoader {
     return this
   }
 
-  handleResult(method, result) {
+  params(cacheParamsFn) {
+    this.options = assign(this.options, { cacheParamsFn })
+    return this
+  }
+
+  async handleResult(result) {
     const { selection } = this.options
-    const { selectFn, key } = this.loader.options
+    const { selectFn } = this.loader.options
 
     if (!result || !selection) {
       return result
     }
 
-    const convertResult = (result) => {
-      return selectFn([key, ...selection], result)
-    }
-
-    if (method === 'find' && result.data) {
-      return {
-        ...result,
-        data: result.data.map(convertResult)
-      }
-    }
-
-    if (Array.isArray(result)) {
-      return result.map((result) => {
-        return Array.isArray(result) ? result.map(convertResult) : convertResult(result)
-      })
-    }
-
-    return convertResult(result)
+    return await selectFn(selection, result, this)
   }
 
-  async get(id, params, cacheParamsFn) {
-    const result = await this.loader.get(id, params, cacheParamsFn)
-    return this.handleResult('get', result)
+  async get(id, params) {
+    this.options = assign(this.options, { method: 'get' })
+    const result = await this.loader.exec({ ...this.options, id, params })
+    return this.handleResult(result)
   }
 
-  async _get(id, params, cacheParamsFn) {
-    const result = await this.loader._get(id, params, cacheParamsFn)
-    return this.handleResult('_get', result)
+  async _get(id, params) {
+    this.options = assign(this.options, { method: '_get' })
+    const result = await this.loader.exec({ ...this.options, id, params })
+    return this.handleResult(result)
   }
 
-  async find(params, cacheParamsFn) {
-    const result = await this.loader.find(params, cacheParamsFn)
-    return this.handleResult('find', result)
+  async find(params) {
+    this.options = assign(this.options, { method: 'find' })
+    const result = await this.loader.exec({ ...this.options, params })
+    return this.handleResult(result)
   }
 
-  async _find(params, cacheParamsFn) {
-    const result = await this.loader._find(params, cacheParamsFn)
-    return this.handleResult('_find', result)
+  async _find(params) {
+    this.options = assign(this.options, { method: '_find' })
+    const result = await this.loader.exec({ ...this.options, id, params })
+    return this.handleResult(result)
   }
 
-  async load(id, params, cacheParamsFn) {
-    const result = await this.loader.exec({
-      id,
-      params,
-      cacheParamsFn,
-      method: 'load',
-      key: this.options.key,
-      multi: this.options.multi
-    })
-    return this.handleResult('load', result)
+  async load(id, params) {
+    this.options = assign(this.options, { method: 'load' })
+    const result = await this.loader.exec({ ...this.options, id, params })
+    return this.handleResult(result)
   }
 
-  async _load(id, params, cacheParamsFn) {
-    const result = await this.loader.exec({
-      id,
-      params,
-      cacheParamsFn,
-      method: '_load',
-      key: this.options.key,
-      multi: this.options.multi
-    })
-    return this.handleResult('_load', result)
+  async _load(id, params) {
+    this.options = assign(this.options, { method: '_load' })
+    const result = await this.loader.exec({ ...this.options, id, params })
+    return this.handleResult(result)
   }
 }

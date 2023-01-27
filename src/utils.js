@@ -48,14 +48,40 @@ module.exports.defaultCacheKeyFn = (id) => {
   return id.toString ? id.toString() : String(id)
 }
 
-module.exports.defaultSelectFn = (selection, source) => {
+const select = (selection, source) => {
   return selection.reduce((result, key) => {
     if (source[key] !== undefined) {
       result[key] = source[key]
     }
-
     return result
   }, {})
+}
+
+module.exports.defaultSelectFn = (selection, result, chainedLoader) => {
+  if (!Array.isArray(selection)) {
+    throw new Error('selection must be an array');
+  }
+
+  const { key, method } = chainedLoader.options;
+
+  const convertResult = (result) => {
+    return select([key, ...selection], result)
+  }
+
+  if (['find', '_find'].includes(method) && result.data) {
+    return {
+      ...result,
+      data: result.data.map(convertResult)
+    }
+  }
+
+  if (Array.isArray(result)) {
+    return result.map((result) => {
+      return Array.isArray(result) ? result.map(convertResult) : convertResult(result)
+    })
+  }
+
+  return convertResult(result)
 }
 
 module.exports.assign = (target, source) => {
