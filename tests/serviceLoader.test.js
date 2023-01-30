@@ -1,6 +1,5 @@
 const { assert } = require('chai')
 const { ServiceLoader } = require('../src')
-const { stableStringify } = require('../src/utils')
 const { makeApp } = require('./utils')
 
 const testFunc = () => {}

@@ -1,11 +1,41 @@
 const { GeneralError } = require('@feathersjs/errors')
 
-const isObject = (obj) => {
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+const _ = {
+  isObject: (obj) => {
+    if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+      return false
+    }
+    return Object.getPrototypeOf(obj) === Object.prototype
+  },
+  assign: (target, source) => {
+    const result = { ...target }
+    const keys = Object.keys(source);
+    for (let index = 0; index < keys.length; index++) {
+      const key = keys[index];
+      if (source[key] !== undefined) {
+        result[key] = source[key]
+      }
+    }
+    return result
+  },
+  omit: (target, keys) => {
+    const result = { ...target }
+    for (let index = 0; index < keys.length; index++) {
+      delete result[keys[index]]
+    }
+    return result
+  },
+  has: (target, keys) => {
+    for (let index = 0; index < keys.length; index++) {
+      if (Object.prototype.hasOwnProperty.call(target, keys[index])) {
+        return true
+      }
+    }
     return false
   }
-  return Object.getPrototypeOf(obj) === Object.prototype
 }
+
+module.exports._ = _;
 
 module.exports.stableStringify = (object) => {
   return JSON.stringify(object, (key, value) => {
@@ -15,7 +45,7 @@ module.exports.stableStringify = (object) => {
       )
     }
 
-    if (isObject(value)) {
+    if (_.isObject(value)) {
       const keys = Object.keys(value).sort()
       const result = {}
       for (let index = 0, length = keys.length; index < length; ++index) {
@@ -86,16 +116,6 @@ module.exports.defaultSelectFn = (selection, result, options) => {
   }
 
   return convertResult(result)
-}
-
-module.exports.assign = (target, source) => {
-  const result = { ...target }
-  Object.keys(source).forEach((key) => {
-    if (source[key] !== undefined) {
-      result[key] = source[key]
-    }
-  })
-  return result
 }
 
 module.exports.uniqueKeys = (keys) => {

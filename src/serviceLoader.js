@@ -8,8 +8,10 @@ const {
   uniqueKeys,
   uniqueResults,
   uniqueResultsMulti,
-  assign
+  _
 } = require('./utils')
+
+const filters = ['$limit', '$skip', '$select', '$sort'];
 
 const createDataLoader = ({ appService, key, loaderOptions, multi, method, params }) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
@@ -32,7 +34,6 @@ const createDataLoader = ({ appService, key, loaderOptions, multi, method, param
         [key]: { $in: uniqueKeys(keys) }
       }
     }
-    delete loaderParams.query.$limit
     return appService[serviceMethod](loaderParams).then((result) => getResults(keys, result, key))
   }, loaderOptions)
 }
@@ -56,7 +57,7 @@ module.exports = class ServiceLoader {
       key: appService.options.id,
       selectFn: selectFn || defaultSelectFn,
       cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
-      loaderOptions: assign({ cacheKeyFn: defaultCacheKeyFn }, loaderOptions)
+      loaderOptions: _.assign({ cacheKeyFn: defaultCacheKeyFn }, loaderOptions)
     }
   }
 
@@ -64,7 +65,7 @@ module.exports = class ServiceLoader {
     const { appService, loaderOptions, service } = this.options
     cacheParamsFn = cacheParamsFn || this.options.cacheParamsFn
 
-    options = assign(
+    options = _.assign(
       {
         id: null,
         key: this.options.key,
@@ -94,6 +95,10 @@ module.exports = class ServiceLoader {
       await this.cacheMap.set(cacheKey, result)
 
       return result
+    }
+
+    if (options.params.query && _.has(options.params.query, filters)) {
+      throw new GeneralError('Loader `load()` method cannot contain ${filters} in the query')
     }
 
     // stableStringify does not sort arrays on purpose because
@@ -251,7 +256,7 @@ class ChainedLoader {
   }
 
   set(options) {
-    this.options = assign(this.options, options)
+    this.options = _.assign(this.options, options)
     return this
   }
 
@@ -267,9 +272,7 @@ class ChainedLoader {
   }
 
   async exec() {
-    const options = { ...this.options }
-    delete options.selection
-    delete options.loader
+    const options = _.omit(this.options, ['selection', 'loader'])
     const result = await this.options.loader.exec(options)
     return this.handleResult(result)
   }
