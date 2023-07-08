@@ -177,8 +177,8 @@ module.exports = class ServiceLoader {
     return new ChainedLoader(this, { key })
   }
 
-  multi(key) {
-    return new ChainedLoader(this, { key, multi: true })
+  multi(multi = true) {
+    return new ChainedLoader(this, { key: this.options.key, multi })
   }
 
   select(selection) {
@@ -212,68 +212,72 @@ module.exports = class ServiceLoader {
 
 class ChainedLoader {
   constructor(loader, options) {
-    this.options = { ...options, loader }
+    this.loader = loader;
+    this._selectFn = this.loader.options.selectFn;
+    this.options = { ...options }
   }
 
   key(key) {
-    return this.set({ key, multi: false })
+    return this._set({ key })
   }
 
-  multi(key) {
-    return this.set({ key, multi: true })
+  multi(multi = true) {
+    return this._set({ multi })
   }
 
-  select(selection) {
-    return this.set({ selection })
+  select(selection, selectFn) {
+    this.selection = selection;
+    if (selectFn) {
+      this.selectFn = selectFn
+    }
+    return this;
   }
 
   params(cacheParamsFn) {
-    return this.set({ cacheParamsFn })
+    return this._set({ cacheParamsFn })
   }
 
   async get(id, params) {
-    return this.set({ method: 'get', id, params }).exec()
+    return this._set({ method: 'get', id, params }).exec()
   }
 
   async _get(id, params) {
-    return this.set({ method: '_get', id, params }).exec()
+    return this._set({ method: '_get', id, params }).exec()
   }
 
   async find(params) {
-    return this.set({ method: 'find', params }).exec()
+    return this._set({ method: 'find', params }).exec()
   }
 
   async _find(params) {
-    return this.set({ method: '_find', params }).exec()
+    return this._set({ method: '_find', params }).exec()
   }
 
   async load(id, params) {
-    return this.set({ method: 'load', id, params }).exec()
+    return this._set({ method: 'load', id, params }).exec()
   }
 
   async _load(id, params) {
-    return this.set({ method: '_load', id, params }).exec()
+    return this._set({ method: '_load', id, params }).exec()
   }
 
-  set(options) {
+  _set(options) {
     this.options = _.assign(this.options, options)
     return this
   }
 
   async handleResult(result) {
     const { selection } = this.options
-    const { selectFn } = this.options.loader.options
 
     if (!result || !selection) {
       return result
     }
 
-    return await selectFn(selection, result, this.options)
+    return await this._selectFn(selection, result, this.options)
   }
 
   async exec() {
-    const options = _.omit(this.options, ['selection', 'loader'])
-    const result = await this.options.loader.exec(options)
+    const result = await this.loader.exec(this.options)
     return this.handleResult(result)
   }
 }

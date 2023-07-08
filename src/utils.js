@@ -18,16 +18,24 @@ const _ = {
     }
     return result
   },
-  omit: (target, keys) => {
-    const result = { ...target }
+  omit: (source, keys) => {
+    const result = { ...source }
     for (let index = 0; index < keys.length; index++) {
       delete result[keys[index]]
     }
     return result
   },
-  has: (target, keys) => {
+  pick: (source, keys) => {
+    return keys.reduce((result, key) => {
+      if (source[key] !== undefined) {
+        result[key] = source[key]
+      }
+      return result
+    }, {})
+  },
+  has: (source, keys) => {
     for (let index = 0; index < keys.length; index++) {
-      if (Object.prototype.hasOwnProperty.call(target, keys[index])) {
+      if (Object.prototype.hasOwnProperty.call(source, keys[index])) {
         return true
       }
     }
@@ -78,24 +86,16 @@ module.exports.defaultCacheKeyFn = (id) => {
   return id.toString ? id.toString() : String(id)
 }
 
-const select = (selection, source) => {
-  return selection.reduce((result, key) => {
-    if (source[key] !== undefined) {
-      result[key] = source[key]
-    }
-    return result
-  }, {})
-}
 
 module.exports.defaultSelectFn = (selection, result, options) => {
   if (!Array.isArray(selection)) {
-    throw new Error('selection must be an array')
+    throw new Error('The argument to the `.select()` method must be an array when using the default `selectFn` option.')
   }
 
   const { key, method, multi } = options
 
   const convertResult = (result) => {
-    return select([key, ...selection], result)
+    return _.pick(result, [key, ...selection])
   }
 
   if (['find', '_find'].includes(method) && result.data) {
