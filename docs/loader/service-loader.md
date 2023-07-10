@@ -30,10 +30,9 @@ TODO: Provide Links to the DataLoader and FindLoader options.
 
 - **options** `{Object}`
   - **app** `{Object}` - A Feathers app,
-  - **serviceName** `{String}` - The name of the service
+  - **service** `{String}` - The name of the service
   - **cacheMap** `{Object}` - Instance of Map (or an object with a similar API) to be used as cache. Defaults to `new Map()`
   - **cacheParamsFn** `{Function}` - A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and removes any non-serializable items. The default function returns traverses params and removes any functions. Defaults to `defaultCacheParamsFn`
-  - **cacheKeyFn** `{Function}` - Normalize keys. `(key) => key && key.toString ? key.toString() : String(key)` Defaults to `defaultCacheKeyFn`
 
 There are two ways to create `ServiceLoader` instances.
 
@@ -58,7 +57,7 @@ You can also directly create an instance using the `ServiceLoader` class.
 const { ServiceLoader } = require('@feathersjs/loader')
 
 // This is our ServiceLoader instance
-const userLoader = new ServiceLoader({ app, serviceName: 'users' })
+const userLoader = new ServiceLoader({ app, service: 'users' })
 ```
 
 ## Example
@@ -71,7 +70,7 @@ const loaderOptions = {}
 
 const loader = new ServiceLoader({
   app
-  serviceName: 'users',
+  service: 'users',
   ...loaderOptions
 })
 

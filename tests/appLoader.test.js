@@ -25,11 +25,12 @@ describe('appLoader.test', () => {
     assert.isFunction(serviceLoader._find)
     assert.isFunction(serviceLoader.load)
     assert.isFunction(serviceLoader._load)
-    assert.isFunction(serviceLoader.multi)
     assert.isFunction(serviceLoader.key)
+    assert.isFunction(serviceLoader.select)
+    assert.isFunction(serviceLoader.params)
+    assert.isFunction(serviceLoader.multi)
     assert.isFunction(serviceLoader.exec)
     assert.isFunction(serviceLoader.clear)
-    assert.isFunction(serviceLoader.stringifyKey)
   })
 
   it('returns a cached ServiceLoader', () => {

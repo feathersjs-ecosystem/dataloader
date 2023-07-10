@@ -89,7 +89,7 @@ The `AppLoader` lazily configures a new `ServiceLoader` per service as you use t
 
 const { ServiceLoader } = require('feathers-dataloader');
 
-const serviceLoader = new ServiceLoader({ app, serviceName: 'users' });
+const serviceLoader = new ServiceLoader({ app, service: 'users' });
 const user = await serviceLoader.load(1, params);
 const user = await serviceLoader.get(1, params);
 const users = await serviceLoader.find(params);
@@ -176,7 +176,7 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
 | `app`           | `Object`   |            | A Feathers app`                                   |
-| `serviceName`           | `String`   |            | The name of the service like "users"`                                   |
+| `service`           | `String`   |            | The name of the service like "users"`                                   |
 | `cacheMap`           | `Map`   |            | A Map like object with methods get, set, and clear to serve as the cache of results.`                                   |
 | `cacheParamsFn`           | `Function`   |      defaultCacheParamsFn      | A function that returns a JSON stringifiable set or params to be used in the cacheKey. The default function traverses the params and removes any functions`                                   |
 | `loaderOptions`           | `Object`   |      {}      | See `DataLoader`                           |
@@ -187,7 +187,7 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 
   const loader = new ServiceLoader({
     app,
-    serviceName: 'users'
+    service: 'users'
     cacheParamsFn: (params) => {
       return {
         userId: params.user.id,

@@ -1,11 +1,49 @@
 const { GeneralError } = require('@feathersjs/errors')
 
-const isObject = (obj) => {
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+const _ = {
+  isObject: (obj) => {
+    if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+      return false
+    }
+    return Object.getPrototypeOf(obj) === Object.prototype
+  },
+  assign: (target, source) => {
+    const result = { ...target }
+    const keys = Object.keys(source);
+    for (let index = 0; index < keys.length; index++) {
+      const key = keys[index];
+      if (source[key] !== undefined) {
+        result[key] = source[key]
+      }
+    }
+    return result
+  },
+  omit: (source, keys) => {
+    const result = { ...source }
+    for (let index = 0; index < keys.length; index++) {
+      delete result[keys[index]]
+    }
+    return result
+  },
+  pick: (source, keys) => {
+    return keys.reduce((result, key) => {
+      if (source[key] !== undefined) {
+        result[key] = source[key]
+      }
+      return result
+    }, {})
+  },
+  has: (source, keys) => {
+    for (let index = 0; index < keys.length; index++) {
+      if (Object.prototype.hasOwnProperty.call(source, keys[index])) {
+        return true
+      }
+    }
     return false
   }
-  return Object.getPrototypeOf(obj) === Object.prototype
 }
+
+module.exports._ = _;
 
 module.exports.stableStringify = (object) => {
   return JSON.stringify(object, (key, value) => {
@@ -15,7 +53,7 @@ module.exports.stableStringify = (object) => {
       )
     }
 
-    if (isObject(value)) {
+    if (_.isObject(value)) {
       const keys = Object.keys(value).sort()
       const result = {}
       for (let index = 0, length = keys.length; index < length; ++index) {
@@ -46,6 +84,38 @@ module.exports.defaultCacheKeyFn = (id) => {
     return id
   }
   return id.toString ? id.toString() : String(id)
+}
+
+
+module.exports.defaultSelectFn = (selection, result, options) => {
+  if (!Array.isArray(selection)) {
+    throw new Error('The argument to the `.select()` method must be an array when using the default `selectFn` option.')
+  }
+
+  const { key, method, multi } = options
+
+  const convertResult = (result) => {
+    return _.pick(result, [key, ...selection])
+  }
+
+  if (['find', '_find'].includes(method) && result.data) {
+    return {
+      ...result,
+      data: result.data.map(convertResult)
+    }
+  }
+
+  if (multi) {
+    return result.map((result) => {
+      return result.map(convertResult)
+    })
+  }
+
+  if (Array.isArray(result)) {
+    return result.map(convertResult)
+  }
+
+  return convertResult(result)
 }
 
 module.exports.uniqueKeys = (keys) => {
