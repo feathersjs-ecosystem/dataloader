@@ -11,7 +11,7 @@ const {
   _
 } = require('./utils')
 
-const filters = ['$limit', '$skip', '$select', '$sort'];
+const filters = ['$limit', '$skip', '$select', '$sort']
 
 const createDataLoader = ({ appService, key, loaderOptions, multi, method, params }) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
@@ -82,19 +82,19 @@ module.exports = class ServiceLoader {
     if (['get', '_get', 'find', '_find'].includes(options.method)) {
       const cacheKey = stringifyKey(options, cacheParamsFn)
 
-      const cachedResult = await this.cacheMap.get(cacheKey)
+      const cachedPromise = await this.cacheMap.get(cacheKey)
 
-      if (cachedResult) {
-        return cachedResult
+      if (cachedPromise) {
+        return cachedPromise
       }
 
-      const result = ['get', '_get'].includes(options.method)
-        ? await appService[options.method](options.id, options.params)
-        : await appService[options.method](options.params)
+      const promise = ['get', '_get'].includes(options.method)
+        ? appService[options.method](options.id, options.params)
+        : appService[options.method](options.params)
 
-      await this.cacheMap.set(cacheKey, result)
+      await this.cacheMap.set(cacheKey, promise)
 
-      return result
+      return promise
     }
 
     if (options.params.query && _.has(options.params.query, filters)) {
@@ -115,10 +115,10 @@ module.exports = class ServiceLoader {
       cacheParamsFn
     )
 
-    const cachedResult = await this.cacheMap.get(cacheKey)
+    const cachedPromise = await this.cacheMap.get(cacheKey)
 
-    if (cachedResult) {
-      return cachedResult
+    if (cachedPromise) {
+      return cachedPromise
     }
 
     const loaderConfig = {
@@ -140,13 +140,11 @@ module.exports = class ServiceLoader {
 
     this.loaders.set(loaderKey, dataLoader)
 
-    const result = Array.isArray(sortedId)
-      ? await dataLoader.loadMany(sortedId)
-      : await dataLoader.load(sortedId)
+    const promise = Array.isArray(sortedId) ? dataLoader.loadMany(sortedId) : dataLoader.load(sortedId)
 
-    await this.cacheMap.set(cacheKey, result)
+    await this.cacheMap.set(cacheKey, promise)
 
-    return result
+    return promise
   }
 
   get(id, params) {
@@ -177,12 +175,16 @@ module.exports = class ServiceLoader {
     return new ChainedLoader(this, { key })
   }
 
-  multi(multi = true) {
-    return new ChainedLoader(this, { key: this.options.key, multi })
+  multi(key) {
+    return new ChainedLoader(this, { key, multi: true })
   }
 
-  select(selection) {
-    return new ChainedLoader(this, { key: this.options.key, selection })
+  select(selection, selectFn) {
+    return new ChainedLoader(this, {
+      key: this.options.key,
+      selection,
+      selectFn
+    })
   }
 
   params(cacheParamsFn) {
@@ -211,26 +213,29 @@ module.exports = class ServiceLoader {
 }
 
 class ChainedLoader {
-  constructor(loader, options) {
-    this.loader = loader;
-    this._selectFn = this.loader.options.selectFn;
-    this.options = { ...options }
+  constructor(loader, { selectFn, selection, ...config }) {
+    this.loader = loader
+    this.options = {
+      selection,
+      selectFn: selectFn || this.loader.options.selectFn
+    }
+    this.config = config
   }
 
   key(key) {
     return this._set({ key })
   }
 
-  multi(multi = true) {
-    return this._set({ multi })
+  multi(key) {
+    return this._set({ multi: true, key })
   }
 
   select(selection, selectFn) {
-    this.selection = selection;
+    this.options.selection = selection
     if (selectFn) {
-      this.selectFn = selectFn
+      this.options.selectFn = selectFn
     }
-    return this;
+    return this
   }
 
   params(cacheParamsFn) {
@@ -261,23 +266,23 @@ class ChainedLoader {
     return this._set({ method: '_load', id, params }).exec()
   }
 
-  _set(options) {
-    this.options = _.assign(this.options, options)
+  _set(config) {
+    this.config = _.assign(this.config, config)
     return this
   }
 
   async handleResult(result) {
-    const { selection } = this.options
+    const { selection, selectFn } = this.options
 
     if (!result || !selection) {
       return result
     }
 
-    return await this._selectFn(selection, result, this.options)
+    return selectFn(selection, result, this.config)
   }
 
   async exec() {
-    const result = await this.loader.exec(this.options)
+    const result = await this.loader.exec(this.config)
     return this.handleResult(result)
   }
 }

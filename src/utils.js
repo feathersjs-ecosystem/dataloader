@@ -9,9 +9,9 @@ const _ = {
   },
   assign: (target, source) => {
     const result = { ...target }
-    const keys = Object.keys(source);
+    const keys = Object.keys(source)
     for (let index = 0; index < keys.length; index++) {
-      const key = keys[index];
+      const key = keys[index]
       if (source[key] !== undefined) {
         result[key] = source[key]
       }
@@ -43,7 +43,7 @@ const _ = {
   }
 }
 
-module.exports._ = _;
+module.exports._ = _
 
 module.exports.stableStringify = (object) => {
   return JSON.stringify(object, (key, value) => {
@@ -86,10 +86,11 @@ module.exports.defaultCacheKeyFn = (id) => {
   return id.toString ? id.toString() : String(id)
 }
 
-
 module.exports.defaultSelectFn = (selection, result, options) => {
   if (!Array.isArray(selection)) {
-    throw new Error('The argument to the `.select()` method must be an array when using the default `selectFn` option.')
+    throw new Error(
+      'The argument to the `.select()` method must be an array when using the default `selectFn` option.'
+    )
   }
 
   const { key, method, multi } = options
