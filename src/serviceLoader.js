@@ -44,7 +44,7 @@ module.exports = class ServiceLoader {
       app,
       serviceName,
       service,
-      key: service.options.id,
+      key: service.options && service.options.id || 'id',
       cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
       loaderOptions: {
         cacheKeyFn: defaultCacheKeyFn,
