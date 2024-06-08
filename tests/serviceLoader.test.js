@@ -9,7 +9,7 @@ describe('serviceLoader.test', () => {
   it('creates a serviceLoader', () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     assert.isFunction(serviceLoader.get)
     assert.isFunction(serviceLoader._get)
@@ -18,8 +18,6 @@ describe('serviceLoader.test', () => {
     assert.isFunction(serviceLoader.load)
     assert.isFunction(serviceLoader._load)
     assert.isFunction(serviceLoader.key)
-    assert.isFunction(serviceLoader.select)
-    assert.isFunction(serviceLoader.params)
     assert.isFunction(serviceLoader.multi)
     assert.isFunction(serviceLoader.exec)
     assert.isFunction(serviceLoader.clear)
@@ -28,7 +26,7 @@ describe('serviceLoader.test', () => {
   it('takes a cacheParamsFn option', () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts',
+      path: 'posts',
       cacheParamsFn: testFunc
     })
     assert.deepEqual(serviceLoader.options.cacheParamsFn, testFunc)
@@ -37,18 +35,18 @@ describe('serviceLoader.test', () => {
   it('passes loader options', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts',
+      path: 'posts',
       cacheKeyFn: testFunc
     })
     await serviceLoader.load(1)
-    const [dataLoader] = serviceLoader.loaders.values()
+    const [dataLoader] = serviceLoader.options.loaders.values()
     assert.deepEqual(dataLoader._cacheKeyFn, testFunc)
   })
 
   it('works with load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.load(1)
@@ -58,7 +56,7 @@ describe('serviceLoader.test', () => {
   it('works with load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const defaultResult = await Promise.all([app.service('posts').get(1), app.service('posts').get(2)])
     const result = await serviceLoader.load([1, 2])
@@ -68,7 +66,7 @@ describe('serviceLoader.test', () => {
   it('works with key("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body').load('John post')
@@ -78,7 +76,7 @@ describe('serviceLoader.test', () => {
   it('works with key("key")._load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body')._load('John post')
@@ -88,7 +86,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key").load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'comments'
+      path: 'comments'
     })
     const result = await serviceLoader.multi('postId').load(1)
     assert.deepEqual(result.length, 3)
@@ -97,7 +95,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key")._load(id)', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'comments'
+      path: 'comments'
     })
     const result = await serviceLoader.multi('postId')._load(1)
     assert.deepEqual(result.length, 3)
@@ -106,7 +104,7 @@ describe('serviceLoader.test', () => {
   it('works with multi("key").load([id1, id2])', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'comments'
+      path: 'comments'
     })
     const defaultResult = await Promise.all([
       app.service('comments').find({ paginate: false, query: { postId: 1 } }),
@@ -116,126 +114,10 @@ describe('serviceLoader.test', () => {
     assert.deepEqual(result, defaultResult)
   })
 
-  it('works with select(selection).load()', async () => {
-    const serviceLoader = new ServiceLoader({
-      app,
-      service: 'posts'
-    })
-    const mainResult = await app.service('posts').get(1)
-    const defaultResult = await serviceLoader.load(1)
-    const selectedResult = await serviceLoader.select(['body']).load(1)
-
-    assert.deepEqual(selectedResult, {
-      id: defaultResult.id,
-      body: defaultResult.body
-    })
-    assert.deepEqual(mainResult, defaultResult)
-    assert.deepEqual(serviceLoader.cacheMap.size, 1)
-  })
-
-  it('works with select(selection).get()', async () => {
-    const serviceLoader = new ServiceLoader({
-      app,
-      service: 'posts'
-    })
-    const mainResult = await app.service('posts').get(1)
-    const defaultResult = await serviceLoader.get(1)
-    const selectedResult = await serviceLoader.select(['body']).get(1)
-
-    assert.deepEqual(selectedResult, {
-      id: defaultResult.id,
-      body: defaultResult.body
-    })
-    assert.deepEqual(mainResult, defaultResult)
-    assert.deepEqual(serviceLoader.cacheMap.size, 1)
-  })
-
-  it('works with select(selection).find()', async () => {
-    const serviceLoader = new ServiceLoader({
-      app,
-      service: 'posts'
-    })
-    const mainResult = await app.service('posts').find()
-    const defaultResult = await serviceLoader.find()
-    const selectedResult = await serviceLoader.select(['body']).find()
-
-    assert.deepEqual(
-      selectedResult,
-      defaultResult.map((result) => {
-        return {
-          id: result.id,
-          body: result.body
-        }
-      })
-    )
-    assert.deepEqual(mainResult, defaultResult)
-    assert.deepEqual(serviceLoader.cacheMap.size, 1)
-  })
-
-  it('works with select(selection).load([id1, id2])', async () => {
-    const serviceLoader = new ServiceLoader({
-      app,
-      service: 'posts'
-    })
-    const mainResult = await app.service('posts').find({
-      paginate: false,
-      query: {
-        id: { $in: [1, 2] },
-        $sort: { id: 1 }
-      }
-    })
-    const defaultResult = await serviceLoader.load([1, 2])
-    const selectedResult = await serviceLoader.select(['body']).load([1, 2])
-
-    assert.deepEqual(
-      selectedResult,
-      defaultResult.map((result) => {
-        return {
-          id: result.id,
-          body: result.body
-        }
-      })
-    )
-    assert.deepEqual(mainResult, defaultResult)
-    assert.deepEqual(serviceLoader.cacheMap.size, 1)
-  })
-
-  it('works with select(selection).multi(key).load([id1, id2])', async () => {
-    const serviceLoader = new ServiceLoader({
-      app,
-      service: 'comments'
-    })
-    const result1 = await app.service('comments').find({
-      paginate: false,
-      query: { postId: 1 }
-    })
-    const result2 = await app.service('comments').find({
-      paginate: false,
-      query: { postId: 2 }
-    })
-    const mainResult = [result1, result2]
-    const defaultResult = await serviceLoader.multi('postId').load([1, 2])
-    const selectedResult = await serviceLoader.multi('postId').select(['text']).load([1, 2])
-
-    assert.deepEqual(
-      selectedResult,
-      defaultResult.map((result) => {
-        return result.map((result) => {
-          return {
-            postId: result.postId,
-            text: result.text
-          }
-        })
-      })
-    )
-    assert.deepEqual(mainResult, defaultResult)
-    assert.deepEqual(serviceLoader.cacheMap.size, 1)
-  })
-
   it('works with get', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.get(1)
@@ -245,7 +127,7 @@ describe('serviceLoader.test', () => {
   it('works with find', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const defaultResult = await app.service('posts').find()
     const result = await serviceLoader.find()
@@ -255,7 +137,7 @@ describe('serviceLoader.test', () => {
   it('works with underscored methods', async () => {
     const serviceLoader = new ServiceLoader({
       app,
-      service: 'posts'
+      path: 'posts'
     })
     const methods = ['_get', '_find', '_load']
     let hookCalled = false
@@ -278,12 +160,12 @@ describe('serviceLoader.test', () => {
     const cacheMap = new Map()
     const postsLoader = new ServiceLoader({
       app,
-      service: 'posts',
+      path: 'posts',
       cacheMap: cacheMap
     })
     const commentsLoader = new ServiceLoader({
       app,
-      service: 'comments',
+      path: 'comments',
       cacheMap: cacheMap
     })
 
@@ -296,6 +178,6 @@ describe('serviceLoader.test', () => {
     await postsLoader.clear()
 
     assert.deepEqual(cacheMap.size, 1)
-    assert.deepEqual(postsLoader.loaders.size, 0)
+    assert.deepEqual(postsLoader.options.loaders.size, 0)
   })
 })

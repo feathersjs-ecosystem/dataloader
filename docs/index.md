@@ -83,13 +83,13 @@ app.service('posts').hooks({
 });
 ```
 
-The `AppLoader` lazily configures a new `ServiceLoader` per service as you use them. This means that you do not have to configure the lower level `ServiceLoader` classes. But, you can use these classes individually, although it is generally not needed.
+The `AppLoader` lazily configures a new `ServiceLoader` per service as you use them. This means that you do not have to configure the lower level `ServiceLoader` classes. You can use these classes individually, although it is generally not needed.
 
 ```js
 
 const { ServiceLoader } = require('feathers-dataloader');
 
-const serviceLoader = new ServiceLoader({ app, service: 'users' });
+const serviceLoader = new ServiceLoader({ app, path: 'users' });
 const user = await serviceLoader.load(1, params);
 const user = await serviceLoader.get(1, params);
 const users = await serviceLoader.find(params);
@@ -131,7 +131,7 @@ Create a new app-loader. This is the most commonly used class.
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
 | `app`           | `Object`   |            | A Feathers app                                   |
-| `services`      |  `Object`  | `{}`| An object where each property is a service name and the value is loader options for that service. These options override the `globalLoaderOptions` |
+| `services`      |  `Object`  | `{}`| An object where each property is a service name and the value is `loaderOptions` for that service. These options override the `globalLoaderOptions` |
 | `ServiceLoader`      |  `Class`  | `ServiceLoader`| A base class that will be used to create each ServiceLoader instance |
 | `globalLoaderOptions`           | `Object`   |      {}      | Options that will be assigned to every new `ServiceLoader`                                |
 
@@ -164,21 +164,23 @@ Create a new app-loader. This is the most commonly used class.
 <!--- class ServiceLoader --------------------------------------------------------------------------->
 <h2 id="class-serviceloader">class ServiceLoader( [, options] )</h2>
 
-Create a new service-loader. This class lazily configures underlying `DataLoader` and `FindLoader` for a given service
+Create a new service-loader. This class lazily configures underlying `DataLoader` and takes many `DataLoader` options.
 
 - **Arguments:**
   - `{Object} [ options ]`
-    - `{Object} service`
+    - `{Object} path`
     - `{Map} cacheMap`
-    - `{Map} cacheParamsFn`
+    - `{Function} cacheParamsFn`
+    - `{Function} selectFn`
     - ...loaderOptions
 
 | Argument        |    Type    |   Default  | Description                                      |
 | --------------- | :--------: | ---------- | ------------------------------------------------ |
-| `app`           | `Object`   |            | A Feathers app`                                   |
-| `service`           | `String`   |            | The name of the service like "users"`                                   |
-| `cacheMap`           | `Map`   |            | A Map like object with methods get, set, and clear to serve as the cache of results.`                                   |
+| `app`           | `Object`   |            | A Feathers app                                   |
+| `path`           | `String`   |            | The name of the service like "users"                                   |
+| `cacheMap`           | `Map`   |            | A Map like object with methods get, set, and clear to serve as the cache of results.                                   |
 | `cacheParamsFn`           | `Function`   |      defaultCacheParamsFn      | A function that returns a JSON stringifiable set or params to be used in the cacheKey. The default function traverses the params and removes any functions`                                   |
+| `selectFn`           | `Function`   |      defaultSelectFn      | A function that selects or resolves data after it is returned from the cache                                   |
 | `loaderOptions`           | `Object`   |      {}      | See `DataLoader`                           |
 
 
@@ -187,7 +189,7 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 
   const loader = new ServiceLoader({
     app,
-    service: 'users'
+    path: 'users'
     cacheParamsFn: (params) => {
       return {
         userId: params.user.id,
@@ -217,7 +219,7 @@ Create a new service-loader. This class lazily configures underlying `DataLoader
 <!--- class DataLoader --------------------------------------------------------------------------->
 <h2 id="class-dataloader">class DataLoader( batchLoadFunc [, options] )</h2>
 
-This library re-exports [Dataloader](https://www.npmjs.com/package/dataloader) from its original package. Please see its documentation for more information. `loaderOptions` given to `BatchLoader` will be used to configure Dataloaders. You can also import `Dataloader` along with some helpful utility functions to build custom loaders.
+This library re-exports [Dataloader](https://www.npmjs.com/package/dataloader) from its original package. Please see its documentation for more information. `loaderOptions` given to `ServiceLoader` will be used to configure Dataloaders. You can also import `Dataloader` along with some helpful utility functions to build custom loaders.
 
   ```js
   const { DataLoader uniqueResults, uniqueKeys } = require("feathers-dataloader");

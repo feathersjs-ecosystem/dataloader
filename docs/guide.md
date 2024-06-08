@@ -125,7 +125,7 @@ app.service('posts').hooks({
 The ServiceLoader's underlying DataLoader takes a `maxBatchSize` option. This option limits the number of ids in the `$in` query. Huge arrays of ids can lead to performance issues and even database lockup. By using the `maxBatchSize` you can break those queries into smaller ones. You should monitor your own application to determine the best number to use for your batch size, but setting some maximum is recommended.
 
 ```js
-const { AppLoader, ServiceLoader } = require('feathers-dataloader');
+const { AppLoader } = require('feathers-dataloader');
 
 const loader = new AppLoader({ app, maxBatchSize: 100 });
 

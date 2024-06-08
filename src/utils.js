@@ -86,39 +86,6 @@ module.exports.defaultCacheKeyFn = (id) => {
   return id.toString ? id.toString() : String(id)
 }
 
-module.exports.defaultSelectFn = (selection, result, options) => {
-  if (!Array.isArray(selection)) {
-    throw new Error(
-      'The argument to the `.select()` method must be an array when using the default `selectFn` option.'
-    )
-  }
-
-  const { key, method, multi } = options
-
-  const convertResult = (result) => {
-    return _.pick(result, [key, ...selection])
-  }
-
-  if (['find', '_find'].includes(method) && result.data) {
-    return {
-      ...result,
-      data: result.data.map(convertResult)
-    }
-  }
-
-  if (multi) {
-    return result.map((result) => {
-      return result.map(convertResult)
-    })
-  }
-
-  if (Array.isArray(result)) {
-    return result.map(convertResult)
-  }
-
-  return convertResult(result)
-}
-
 module.exports.uniqueKeys = (keys) => {
   const found = {}
   const unique = []
