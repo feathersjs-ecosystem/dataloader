@@ -1,60 +1,60 @@
-const { assert, expect } = require('chai')
-const {
+import { describe, it, expect } from 'vitest'
+import {
   uniqueKeys,
   uniqueResults,
   uniqueResultsMulti,
   stableStringify,
   defaultCacheParamsFn,
   defaultCacheKeyFn
-} = require('../src/utils')
+} from './utils.js'
 
 describe('utils.test', () => {
   it('uniqueKeys dedupes keys', () => {
     const keys = [1, 1, 2, 2]
     const newKeys = uniqueKeys(keys)
-    assert.deepEqual(newKeys, [1, 2])
+    expect(newKeys).toEqual([1, 2])
   })
 
   it('uniqueResults returns proper number of results', () => {
     const keys = [1, 2]
     const results = [{ id: 1 }, { id: 2 }, { id: 3 }]
     const newResults = uniqueResults(keys, results)
-    assert.deepEqual(newResults, [{ id: 1 }, { id: 2 }])
+    expect(newResults).toEqual([{ id: 1 }, { id: 2 }])
   })
 
   it('uniqueResults returns results in proper order', () => {
     const keys = [1, 2]
     const results = [{ id: 2 }, { id: 1 }]
     const newResults = uniqueResults(keys, results)
-    assert.deepEqual(newResults, [{ id: 1 }, { id: 2 }])
+    expect(newResults).toEqual([{ id: 1 }, { id: 2 }])
   })
 
   it('uniqueResults returns a default value', () => {
     const keys = [1, 2, 3]
     const results = [{ id: 1 }, { id: 2 }]
     const newResults = uniqueResults(keys, results)
-    assert.deepEqual(newResults, [{ id: 1 }, { id: 2 }, null])
+    expect(newResults).toEqual([{ id: 1 }, { id: 2 }, null])
   })
 
   it('uniqueResultsMulti returns proper number of results', () => {
     const keys = [1, 2]
     const results = [{ id: 1 }, { id: 2 }, { id: 3 }]
     const newResults = uniqueResultsMulti(keys, results)
-    assert.deepEqual(newResults, [[{ id: 1 }], [{ id: 2 }]])
+    expect(newResults).toEqual([[{ id: 1 }], [{ id: 2 }]])
   })
 
   it('uniqueResultsMulti returns results in the proper order', () => {
     const keys = [1, 2]
     const results = [{ id: 2 }, { id: 1 }]
     const newResults = uniqueResultsMulti(keys, results)
-    assert.deepEqual(newResults, [[{ id: 1 }], [{ id: 2 }]])
+    expect(newResults).toEqual([[{ id: 1 }], [{ id: 2 }]])
   })
 
   it('uniqueResultsMulti returns a default value', () => {
     const keys = [1, 2, 3]
     const results = [{ id: 1 }, { id: 2 }]
     const newResults = uniqueResultsMulti(keys, results)
-    assert.deepEqual(newResults, [[{ id: 1 }], [{ id: 2 }], null])
+    expect(newResults).toEqual([[{ id: 1 }], [{ id: 2 }], null])
   })
 
   it('stableStringify returns a consistent result', () => {
@@ -72,12 +72,12 @@ describe('utils.test', () => {
       ],
       id: 1
     })
-    assert.deepEqual(params1, params2)
+    expect(params1).toEqual(params2)
   })
 
   it('stableStringify throws with a function param', () => {
     const fn = () => stableStringify({ func: () => {} })
-    expect(fn).to.throw()
+    expect(fn).toThrow()
   })
 
   it('defaultCacheKeyFn coerces things to string', () => {
@@ -87,9 +87,9 @@ describe('utils.test', () => {
       }
     }
 
-    assert.deepEqual(defaultCacheKeyFn(1), '1')
-    assert.deepEqual(defaultCacheKeyFn('1'), '1')
-    assert.deepEqual(defaultCacheKeyFn(_id), '1')
+    expect(defaultCacheKeyFn(1)).toEqual('1')
+    expect(defaultCacheKeyFn('1')).toEqual('1')
+    expect(defaultCacheKeyFn(_id)).toEqual('1')
   })
 
   it('defaultCacheParamsFn only returns valid props', () => {
@@ -104,6 +104,6 @@ describe('utils.test', () => {
       otherProp: 'otherProp'
     }
     const cacheParams = defaultCacheParamsFn(params)
-    assert.deepEqual(cacheParams, safeParams)
+    expect(cacheParams).toEqual(safeParams)
   })
 })

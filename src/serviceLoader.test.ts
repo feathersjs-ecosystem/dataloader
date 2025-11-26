@@ -1,48 +1,51 @@
-const { assert } = require('chai')
-const { ServiceLoader } = require('../src')
-const { stableStringify } = require('../src/utils')
-const { makeApp } = require('./utils')
+import { describe, it, expect } from 'vitest'
+import { ServiceLoader, CacheParamsFn } from './index.js'
+import { stableStringify } from './utils.js'
+import { makeApp } from '../tests/utils.js'
 
-const testFunc = () => {}
+const testCacheParamsFn: CacheParamsFn = () => undefined
+const testCacheKeyFn = () => 'test'
 
 describe('serviceLoader.test', () => {
   const app = makeApp()
+
   it('creates a serviceLoader', () => {
     const serviceLoader = new ServiceLoader({
       app,
       serviceName: 'posts'
     })
-    assert.isFunction(serviceLoader.get)
-    assert.isFunction(serviceLoader._get)
-    assert.isFunction(serviceLoader.find)
-    assert.isFunction(serviceLoader._find)
-    assert.isFunction(serviceLoader.load)
-    assert.isFunction(serviceLoader._load)
-    assert.isFunction(serviceLoader.multi)
-    assert.isFunction(serviceLoader.key)
-    assert.isFunction(serviceLoader.exec)
-    assert.isFunction(serviceLoader.clear)
-    assert.isFunction(serviceLoader.stringifyKey)
+    expect(typeof serviceLoader.get).toBe('function')
+    expect(typeof serviceLoader._get).toBe('function')
+    expect(typeof serviceLoader.find).toBe('function')
+    expect(typeof serviceLoader._find).toBe('function')
+    expect(typeof serviceLoader.load).toBe('function')
+    expect(typeof serviceLoader._load).toBe('function')
+    expect(typeof serviceLoader.multi).toBe('function')
+    expect(typeof serviceLoader.key).toBe('function')
+    expect(typeof serviceLoader.exec).toBe('function')
+    expect(typeof serviceLoader.clear).toBe('function')
+    expect(typeof serviceLoader.stringifyKey).toBe('function')
   })
 
   it('takes a cacheParamsFn option', () => {
     const serviceLoader = new ServiceLoader({
       app,
       serviceName: 'posts',
-      cacheParamsFn: testFunc
+      cacheParamsFn: testCacheParamsFn
     })
-    assert.deepEqual(serviceLoader.options.cacheParamsFn, testFunc)
+    expect(serviceLoader.options.cacheParamsFn).toEqual(testCacheParamsFn)
   })
 
   it('passes loader options', async () => {
     const serviceLoader = new ServiceLoader({
       app,
       serviceName: 'posts',
-      cacheKeyFn: testFunc
+      cacheKeyFn: testCacheKeyFn
     })
     await serviceLoader.load(1)
     const [dataLoader] = serviceLoader.loaders.values()
-    assert.deepEqual(dataLoader._cacheKeyFn, testFunc)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dataLoader as any)._cacheKeyFn).toEqual(testCacheKeyFn)
   })
 
   it('works with load(id)', async () => {
@@ -52,7 +55,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.load(1)
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with load([id1, id2])', async () => {
@@ -62,7 +65,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await Promise.all([app.service('posts').get(1), app.service('posts').get(2)])
     const result = await serviceLoader.load([1, 2])
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with key("key").load(id)', async () => {
@@ -72,7 +75,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body').load('John post')
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with key("key")._load(id)', async () => {
@@ -82,7 +85,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.key('body')._load('John post')
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with multi("key").load(id)', async () => {
@@ -90,8 +93,8 @@ describe('serviceLoader.test', () => {
       app,
       serviceName: 'comments'
     })
-    const result = await serviceLoader.multi('postId').load(1)
-    assert.deepEqual(result.length, 3)
+    const result = (await serviceLoader.multi('postId').load(1)) as unknown[]
+    expect(result.length).toEqual(3)
   })
 
   it('works with multi("key")._load(id)', async () => {
@@ -99,8 +102,8 @@ describe('serviceLoader.test', () => {
       app,
       serviceName: 'comments'
     })
-    const result = await serviceLoader.multi('postId')._load(1)
-    assert.deepEqual(result.length, 3)
+    const result = (await serviceLoader.multi('postId')._load(1)) as unknown[]
+    expect(result.length).toEqual(3)
   })
 
   it('works with multi("key").load([id1, id2])', async () => {
@@ -113,7 +116,7 @@ describe('serviceLoader.test', () => {
       app.service('comments').find({ paginate: false, query: { postId: 2 } })
     ])
     const result = await serviceLoader.multi('postId').load([1, 2])
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with get', async () => {
@@ -123,7 +126,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.get(1)
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with find', async () => {
@@ -133,7 +136,7 @@ describe('serviceLoader.test', () => {
     })
     const defaultResult = await app.service('posts').find()
     const result = await serviceLoader.find()
-    assert.deepEqual(result, defaultResult)
+    expect(result).toEqual(defaultResult)
   })
 
   it('works with underscored methods', async () => {
@@ -141,12 +144,10 @@ describe('serviceLoader.test', () => {
       app,
       serviceName: 'posts'
     })
-    const methods = ['_get', '_find', '_load']
+    const methods = ['_get', '_find', '_load'] as const
     let hookCalled = false
-    const hookCallback = (context) => {
-      console.log('hookCallback called')
+    const hookCallback = () => {
       hookCalled = true
-      return context
     }
     await Promise.all(
       methods.map((method) => {
@@ -156,10 +157,10 @@ describe('serviceLoader.test', () => {
         return serviceLoader[method](1, { callback: hookCallback })
       })
     )
-    assert.deepEqual(hookCalled, false)
+    expect(hookCalled).toEqual(false)
   })
 
-  it('works with stringifyKey', async () => {
+  it('works with stringifyKey', () => {
     const serviceLoader = new ServiceLoader({
       app,
       serviceName: 'posts'
@@ -170,7 +171,7 @@ describe('serviceLoader.test', () => {
       id: 1,
       key: 'id'
     })
-    assert.deepEqual(cacheKey, stableKey)
+    expect(cacheKey).toEqual(stableKey)
   })
 
   it('clears', async () => {
@@ -186,7 +187,7 @@ describe('serviceLoader.test', () => {
       cacheMap: cacheMap
     })
 
-    await commentsLoader.load(1)
+    await commentsLoader.load(11)
 
     await postsLoader.load(1)
     await postsLoader.get(1)
@@ -194,7 +195,31 @@ describe('serviceLoader.test', () => {
 
     await postsLoader.clear()
 
-    assert.deepEqual(cacheMap.size, 1)
-    assert.deepEqual(postsLoader.loaders.size, 0)
+    expect(cacheMap.size).toEqual(1)
+    expect(postsLoader.loaders.size).toEqual(0)
+  })
+
+  it('throws when service lacks find method for load', async () => {
+    const testApp = makeApp()
+    const service = testApp.service('posts')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(service as any).find = undefined
+    const serviceLoader = new ServiceLoader({
+      app: testApp,
+      serviceName: 'posts'
+    })
+    await expect(serviceLoader.load(1)).rejects.toThrow('does not have a find method')
+  })
+
+  it('throws when service lacks _find method for _load', async () => {
+    const testApp = makeApp()
+    const service = testApp.service('posts')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(service as any)._find = undefined
+    const serviceLoader = new ServiceLoader({
+      app: testApp,
+      serviceName: 'posts'
+    })
+    await expect(serviceLoader._load(1)).rejects.toThrow('does not have a _find method')
   })
 })

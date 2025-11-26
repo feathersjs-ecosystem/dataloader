@@ -3,8 +3,21 @@
   "description": "Reduce requests to backend services by batching calls and caching records.",
   "version": "0.1.0",
   "homepage": "https://github.com/feathersjs-ecosystem/dataloader",
-  "main": "src/",
-  "types": "types/",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "keywords": [
     "feathers",
     "feathers-ecosystem",
@@ -27,35 +40,49 @@
     "url": "https://github.com/feathersjs-ecosystem/dataloader/issues"
   },
   "engines": {
-    "node": ">= 12"
+    "node": ">= 18"
   },
+  "packageManager": "pnpm@10.20.0",
   "scripts": {
-    "publish": "git push origin --tags && npm run changelog && git push origin",
-    "release:pre": "npm version prerelease && npm publish --tag pre",
-    "release:patch": "npm version patch && npm publish",
-    "release:minor": "npm version minor && npm publish",
-    "release:major": "npm version major && npm publish",
-    "changelog": "github_changelog_generator && git add CHANGELOG.md && git commit -am \"Updating changelog\"",
-    "prettier": "npx prettier \"./(src|tests)/**/*.js\" --write",
-    "lint:types": "dtslint types/",
-    "mocha": "mocha --recursive tests/",
-    "coverage": "istanbul cover node_modules/mocha/bin/_mocha -- --recursive tests/",
-    "test": "npm run prettier && npm run coverage"
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "prettier": "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
+    "prettier:check": "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "ci": "pnpm run typecheck && pnpm run lint && pnpm run prettier:check && pnpm run test",
+    "prepublishOnly": "pnpm run clean && pnpm run build",
+    "release:pre": "pnpm version prerelease && pnpm publish --tag pre",
+    "release:patch": "pnpm version patch && pnpm publish",
+    "release:minor": "pnpm version minor && pnpm publish",
+    "release:major": "pnpm version major && pnpm publish",
+    "changelog": "github_changelog_generator && git add CHANGELOG.md && git commit -am \"Updating changelog\""
   },
-  "directories": {
-    "src": "src"
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
-    "@feathersjs/feathers": "^5.0.0-pre.28",
-    "chai": "^4.3.6",
-    "dtslint": "^4.2.1",
-    "feathers-memory": "^4.1.0",
-    "istanbul": "1.1.0-alpha.1",
-    "mocha": "^10.0.0",
-    "typescript": "^4.7.4"
+    "@eslint/js": "^9.15.0",
+    "@feathersjs/feathers": "^5.0.31",
+    "@feathersjs/memory": "^5.0.31",
+    "@types/node": "^22.10.1",
+    "@vitest/coverage-v8": "^2.1.6",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.16.0",
+    "vitest": "^2.1.6"
   },
   "dependencies": {
-    "@feathersjs/errors": "^4.5.15",
-    "dataloader": "^2.1.0"
+    "@feathersjs/errors": "^5.0.31",
+    "dataloader": "^2.2.3"
   }
 }
