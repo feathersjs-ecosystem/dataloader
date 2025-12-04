@@ -1,5 +1,5 @@
-const feathers = require('@feathersjs/feathers')
-const memory = require('feathers-memory')
+import { feathers, type Application, type HookContext } from '@feathersjs/feathers'
+import { MemoryService } from '@feathersjs/memory'
 
 const postsStore = {
   1: { id: 1, body: 'John post', userId: 101, starIds: [102, 103, 104] },
@@ -25,17 +25,15 @@ const usersStore = {
   104: { id: 104, name: 'Aubree' }
 }
 
-module.exports = {
-  makeApp
-}
-
-function makeApp() {
+export function makeApp(): Application {
   const app = feathers()
-  app.use('posts', memory({ store: postsStore }))
-  app.use('comments', memory({ store: commentsStore }))
-  app.use('users', memory({ store: usersStore }))
+  app.use('posts', new MemoryService({ store: { ...postsStore }, startId: 5 }))
+  app.use('comments', new MemoryService({ store: { ...commentsStore }, startId: 18 }))
+  app.use('users', new MemoryService({ store: { ...usersStore }, startId: 105 }))
 
-  const callbackHook = async (context) => {
+  const callbackHook = async (
+    context: HookContext & { params: { callback?: (context: HookContext) => Promise<void> } }
+  ) => {
     if (context.params.callback) {
       await context.params.callback(context)
     }
