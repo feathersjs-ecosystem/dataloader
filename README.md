@@ -104,6 +104,33 @@ app.service('posts').hooks({
 })
 ```
 
+## Important Notes
+
+### `$limit` is removed from batched queries
+
+The dataloader works by batching multiple `.load()` calls into a single `$in` query. Because of this, `$limit` in your params would apply to the **entire batch**, not per-key. To prevent unexpected results, **`$limit` is automatically removed** from batched `load` and `_load` queries.
+
+For example, with `multi()`:
+
+```ts
+// If you have 10 lists and want 4 products per list:
+loader
+  .service('saved-products')
+  .multi('listId')
+  .load(listId, {
+    query: { $limit: 4 } // This $limit is REMOVED - you'll get ALL matching products
+  })
+```
+
+The loader batches all `listId` values into one query like `{ listId: { $in: [...allListIds] } }`. A `$limit: 4` would return only 4 products total across all lists, not 4 per list.
+
+If you need per-key limits, handle it after loading:
+
+```ts
+const products = await loader.service('saved-products').multi('listId').load(listId)
+const limitedProducts = products.slice(0, 4)
+```
+
 ## Development
 
 This package uses [pnpm](https://pnpm.io/) and [Vitest](https://vitest.dev/) for development.
