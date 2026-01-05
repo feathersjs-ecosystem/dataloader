@@ -1,5 +1,14 @@
 # Change Log
 
+## [v0.2.1](https://github.com/feathersjs-ecosystem/dataloader/tree/v0.2.1) (2025-01-04)
+
+**Bug Fixes:**
+
+- Fixed dot notation keys not working with `.key()` and `.multi()` ([#10](https://github.com/feathersjs-ecosystem/dataloader/issues/10))
+  - Keys like `'fact.maescli.id'` now correctly traverse nested objects when mapping results
+
+---
+
 ## [v0.2.0](https://github.com/feathersjs-ecosystem/dataloader/tree/v0.2.0) (2025-01-04)
 
 **Breaking Changes:**

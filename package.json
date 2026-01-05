@@ -1,7 +1,7 @@
 {
   "name": "feathers-dataloader",
   "description": "Reduce requests to backend services by batching calls and caching records.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "homepage": "https://github.com/feathersjs-ecosystem/dataloader",
   "type": "module",
   "main": "./dist/index.cjs",

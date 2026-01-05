@@ -32,6 +32,22 @@ const isObject = (obj: unknown): obj is Record<string, unknown> => {
 }
 
 /**
+ * Get a value from an object using dot notation path.
+ * e.g., getByDotPath(obj, 'foo.bar.baz') returns obj.foo.bar.baz
+ */
+const getByDotPath = (obj: Record<string, unknown>, path: string): unknown => {
+  const parts = path.split('.')
+  let current: unknown = obj
+  for (let i = 0; i < parts.length; i++) {
+    if (current === null || current === undefined) {
+      return undefined
+    }
+    current = (current as Record<string, unknown>)[parts[i]!]
+  }
+  return current
+}
+
+/**
  * Stringify an object with consistent key ordering for cache keys.
  * @throws GeneralError if object contains functions
  */
@@ -126,7 +142,7 @@ export const uniqueResults = <T extends ResultWithId, K>(
 
   for (let index = 0, length = serviceResults.length; index < length; ++index) {
     const item = serviceResults[index]!
-    const id = String(item[key])
+    const id = String(getByDotPath(item, key))
     found[id] = item
   }
 
@@ -153,7 +169,7 @@ export const uniqueResultsMulti = <T extends ResultWithId, K>(
 
   for (let index = 0, length = serviceResults.length; index < length; ++index) {
     const item = serviceResults[index]!
-    const id = String(item[key])
+    const id = String(getByDotPath(item, key))
     if (found[id]) {
       found[id].push(item)
     } else {

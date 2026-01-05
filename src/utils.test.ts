@@ -36,6 +36,32 @@ describe('utils.test', () => {
     expect(newResults).toEqual([{ id: 1 }, { id: 2 }, null])
   })
 
+  it('uniqueResults supports dot notation keys', () => {
+    const keys = [1, 2]
+    const results = [
+      { nested: { id: 1 }, name: 'a' },
+      { nested: { id: 2 }, name: 'b' }
+    ]
+    const newResults = uniqueResults(keys, results, 'nested.id')
+    expect(newResults).toEqual([
+      { nested: { id: 1 }, name: 'a' },
+      { nested: { id: 2 }, name: 'b' }
+    ])
+  })
+
+  it('uniqueResults supports deeply nested dot notation keys', () => {
+    const keys = ['x', 'y']
+    const results = [
+      { a: { b: { c: 'x' } }, val: 1 },
+      { a: { b: { c: 'y' } }, val: 2 }
+    ]
+    const newResults = uniqueResults(keys, results, 'a.b.c')
+    expect(newResults).toEqual([
+      { a: { b: { c: 'x' } }, val: 1 },
+      { a: { b: { c: 'y' } }, val: 2 }
+    ])
+  })
+
   it('uniqueResultsMulti returns proper number of results', () => {
     const keys = [1, 2]
     const results = [{ id: 1 }, { id: 2 }, { id: 3 }]
@@ -55,6 +81,23 @@ describe('utils.test', () => {
     const results = [{ id: 1 }, { id: 2 }]
     const newResults = uniqueResultsMulti(keys, results)
     expect(newResults).toEqual([[{ id: 1 }], [{ id: 2 }], null])
+  })
+
+  it('uniqueResultsMulti supports dot notation keys', () => {
+    const keys = [1, 2]
+    const results = [
+      { nested: { id: 1 }, name: 'a' },
+      { nested: { id: 1 }, name: 'b' },
+      { nested: { id: 2 }, name: 'c' }
+    ]
+    const newResults = uniqueResultsMulti(keys, results, 'nested.id')
+    expect(newResults).toEqual([
+      [
+        { nested: { id: 1 }, name: 'a' },
+        { nested: { id: 1 }, name: 'b' }
+      ],
+      [{ nested: { id: 2 }, name: 'c' }]
+    ])
   })
 
   it('stableStringify returns a consistent result', () => {
