@@ -886,6 +886,47 @@ describe('serviceLoader.test', () => {
       assert.lengthOf(calls, 3)
     })
 
+    it('replaces params references on full clear across shared derived loaders', async () => {
+      const derived = loader.key('label').multi()
+      const params = { callback: () => {}, transaction: new Map() }
+      await derived.load('first', params)
+      const previousNormalizer = loader.options.cacheParamsFn
+      const previousKey = previousNormalizer(params)
+      records[0]!.body = 'updated'
+
+      assert.strictEqual(derived.clear(), derived)
+      assert.notStrictEqual(loader.options.cacheParamsFn, previousNormalizer)
+      assert.strictEqual(derived.options.cacheParamsFn, loader.options.cacheParamsFn)
+      assert.notEqual(loader.options.cacheParamsFn(params), previousKey)
+
+      const fresh = (await derived.load('first', params)) as TestRecord[]
+      assert.equal(fresh[0]!.body, 'updated')
+      assert.strictEqual(await loader.key('label').multi().load('first', params), fresh)
+      assert.lengthOf(calls, 2)
+    })
+
+    it.each([{ value: 1 }, { value: [1] }, { value: [] }])(
+      'preserves params references when clearing $value',
+      async ({ value }) => {
+        const params = { callback: () => {}, transaction: new Map() }
+        const before = (await loader.load([1, 2], params)) as TestRecord[]
+        const normalizer = loader.options.cacheParamsFn
+        records[0]!.body = 'updated'
+
+        loader.clear(value)
+        assert.strictEqual(loader.options.cacheParamsFn, normalizer)
+        const after = (await loader.load([1, 2], params)) as TestRecord[]
+        assert.strictEqual(after[1], before[1])
+        if (Array.isArray(value) && value.length === 0) {
+          assert.strictEqual(after[0], before[0])
+          assert.lengthOf(calls, 1)
+        } else {
+          assert.equal(after[0]!.body, 'updated')
+          assert.lengthOf(calls, 2)
+        }
+      }
+    )
+
     it('clears every cached variant from base or derived handles after repeated writes', async () => {
       const keyed = loader.key('label')
       const multi = loader.key('group').multi()
@@ -1022,12 +1063,15 @@ describe('serviceLoader.test', () => {
     it('clears retained derived handles through AppLoader.clear()', async () => {
       const appLoader = new AppLoader({ app: loaderApp })
       const derived = appLoader.service('records').key('group').multi()
-      await derived.load('a')
+      const params = { callback: () => {}, transaction: new Map() }
+      await derived.load('a', params)
+      const previousNormalizer = derived.options.cacheParamsFn
       records[0]!.body = 'updated'
 
       assert.strictEqual(appLoader.clear(), appLoader)
 
-      assert.equal(((await derived.load('a')) as ResultWithId[])[0]!.body, 'updated')
+      assert.notStrictEqual(derived.options.cacheParamsFn, previousNormalizer)
+      assert.equal(((await derived.load('a', params)) as ResultWithId[])[0]!.body, 'updated')
       assert.lengthOf(calls, 2)
     })
 

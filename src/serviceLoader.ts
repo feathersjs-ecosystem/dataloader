@@ -287,10 +287,8 @@ export class ServiceLoader {
     }
 
     const { dataLoader } = cachedLoader
-    
-    return Array.isArray(opts.value)
-      ? dataLoader.loadMany(opts.value)
-      : dataLoader.load(opts.value)
+
+    return Array.isArray(opts.value) ? dataLoader.loadMany(opts.value) : dataLoader.load(opts.value)
   }
 
   load(value: unknown, params?: Params): Promise<unknown> {
@@ -315,6 +313,7 @@ export class ServiceLoader {
     const { loaders } = this.options
     if (value === undefined) {
       loaders.clear()
+      this.options.cacheParamsFn = createDefaultCacheParamsFn()
     } else {
       const values = Array.isArray(value) ? value : [value]
       if (values.length === 0) {
