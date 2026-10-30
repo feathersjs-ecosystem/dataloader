@@ -14,6 +14,7 @@
 
 ### Fixes and improvements
 
+- Resolve matching TypeScript declarations for ESM and CommonJS consumers.
 - Keep derived `key()` and `multi()` handles independent while sharing service cache state.
 - Cache promises and missing results consistently using private in-memory maps.
 - Evict failed loads and arrays containing errors so callers can retry while reusing successful results.
