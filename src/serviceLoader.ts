@@ -22,14 +22,14 @@ export interface ServiceLoaderOptions {
 }
 
 interface LoaderState {
-  key?: string
-  multi?: boolean
+  key: string
+  multi: boolean
 }
 
 interface ExecOptions extends LoaderState {
-  value?: unknown
+  value: unknown
   params?: Params
-  method?: LoadMethod
+  method: LoadMethod
 }
 
 type InternalCacheParamsFn = (params?: Params | null) => string
@@ -44,7 +44,6 @@ interface LoaderService {
 interface SharedLoaderOptions {
   app: ServiceLoaderOptions['app']
   service: LoaderService
-  key: string
   cacheParamsFn: InternalCacheParamsFn
   maxBatchSize?: number
   loaders: Map<string, { key: string; dataLoader: DataLoader<unknown, unknown> }>
@@ -56,7 +55,7 @@ interface CreateDataLoaderOptions {
   maxBatchSize?: number
   multi: boolean
   method: LoadMethod
-  params: Params
+  params?: Params
 }
 
 const filters = ['$skip', '$sort', '$limit']
@@ -78,7 +77,7 @@ const createDataLoader = ({ service, key, maxBatchSize, multi, method, params }:
   const getResults = multi ? uniqueResultsMulti : uniqueResults
   return new DataLoader<unknown, unknown>(
     async (values: readonly unknown[]) => {
-      const query = { ...params.query, [key]: { $in: uniqueKeys([...values]) } }
+      const query = { ...params?.query, [key]: { $in: uniqueKeys([...values]) } }
       const result = await methodFn.call(service, { ...params, paginate: false, query })
       return getResults([...values], result, key)
     },
@@ -86,7 +85,7 @@ const createDataLoader = ({ service, key, maxBatchSize, multi, method, params }:
   )
 }
 
-const stringifyKey = (options: ExecOptions, cacheParamsFn: InternalCacheParamsFn): string => {
+const stringifyKey = (options: Omit<ExecOptions, 'value'>, cacheParamsFn: InternalCacheParamsFn): string => {
   return stableStringify({ ...options, params: cacheParamsFn(options.params) })
 }
 
@@ -231,57 +230,52 @@ export class ServiceLoader {
   options: SharedLoaderOptions
   state: LoaderState
 
-  constructor(options: ServiceLoaderOptions | ServiceLoader, state?: LoaderState) {
-    this.state = state || {}
-
+  constructor(options: ServiceLoaderOptions | ServiceLoader, state?: Partial<LoaderState>) {
     if (options instanceof ServiceLoader) {
       this.options = options.options
+      this.state = _.assign(options.state, state || {})
       return
     }
 
     const { app, serviceName, key, maxBatchSize } = options
     const service = app.service(serviceName) as LoaderService
+
+    this.state = _.assign(
+      {
+        key: key ?? (service.options?.id || 'id'),
+        multi: false
+      },
+      state || {}
+    )
+
     this.options = {
       app,
       service,
-      key: key ?? (service.options?.id || 'id'),
       cacheParamsFn: createDefaultCacheParamsFn(),
       maxBatchSize,
       loaders: new Map()
     }
   }
 
-  private async exec(opts: ExecOptions = {}): Promise<unknown> {
+  private async exec(opts: ExecOptions): Promise<unknown> {
     const { service, maxBatchSize, cacheParamsFn, loaders } = this.options
 
-    const execOptions = _.assign(
-      {
-        value: null as unknown,
-        key: this.options.key,
-        params: {},
-        multi: false,
-        method: 'load' as LoadMethod
-      },
-      _.omit(opts, ['cacheParamsFn'])
-    )
-
-    if (execOptions.params.query && _.has(execOptions.params.query, filters)) {
+    if (opts.params?.query && _.has(opts.params.query, filters)) {
       throw new GeneralError(`Loader load methods cannot contain ${filters.join(', ')} in the query`)
     }
 
-    if (Array.isArray(execOptions.value)) {
-      execOptions.value = [...execOptions.value].sort()
+    if (Array.isArray(opts.value)) {
+      opts.value = [...opts.value].sort()
     }
 
-    const loaderConfig = _.pick(execOptions, ['key', 'multi', 'method', 'params'])
-
+    const loaderConfig = _.pick(opts, ['key', 'multi', 'method', 'params'])
     const loaderKey = stringifyKey(loaderConfig, cacheParamsFn)
 
     let cachedLoader = loaders.get(loaderKey)
 
     if (!cachedLoader) {
       cachedLoader = {
-        key: execOptions.key,
+        key: opts.key,
         dataLoader: createDataLoader({
           service,
           maxBatchSize,
@@ -293,9 +287,10 @@ export class ServiceLoader {
     }
 
     const { dataLoader } = cachedLoader
-    return Array.isArray(execOptions.value)
-      ? dataLoader.loadMany(execOptions.value)
-      : dataLoader.load(execOptions.value)
+    
+    return Array.isArray(opts.value)
+      ? dataLoader.loadMany(opts.value)
+      : dataLoader.load(opts.value)
   }
 
   load(value: unknown, params?: Params): Promise<unknown> {
@@ -325,7 +320,7 @@ export class ServiceLoader {
       if (values.length === 0) {
         return this
       }
-      const key = this.state.key ?? this.options.key
+      const key = this.state.key
       for (const cachedLoader of loaders.values()) {
         if (cachedLoader.key === key) {
           values.forEach((value) => cachedLoader.dataLoader.clear(value))

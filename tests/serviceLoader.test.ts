@@ -41,6 +41,35 @@ describe('serviceLoader.test', () => {
     }
   })
 
+  it.each(['load', '_load'] as const)('batches omitted and empty params through %s', async (method) => {
+    const calls: Params[] = []
+    const find = async (params: BatchParams) => {
+      calls.push(params)
+      return params.query.id!.$in.map((id) => ({ id }))
+    }
+    const loader = new ServiceLoader({ app: mockApp({ find, _find: find }), serviceName: 'records' })
+
+    assert.deepEqual(await Promise.all([loader[method](1), loader[method](2, {})]), [{ id: 1 }, { id: 2 }])
+    assert.deepEqual(calls, [{ paginate: false, query: { id: { $in: [1, 2] } } }])
+  })
+
+  it('reuses the resolved service when creating derived loaders', async () => {
+    let lookups = 0
+    const record = { uuid: 'user-1', email: 'reader@example.com' }
+    const service = { options: { id: 'uuid' }, find: async () => [record] }
+    const app = {
+      service: () => {
+        lookups++
+        return service
+      }
+    } as unknown as ServiceLoaderOptions['app']
+    const loader = new ServiceLoader({ app, serviceName: 'users' })
+
+    assert.deepEqual(await loader.key('email').multi().load('reader@example.com'), [record])
+    assert.deepEqual(await loader.load('user-1'), record)
+    assert.equal(lookups, 1)
+  })
+
   it('ignores the removed cacheParamsFn constructor option', () => {
     const serviceLoader = new ServiceLoader({
       app,
