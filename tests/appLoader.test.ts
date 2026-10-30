@@ -2,8 +2,6 @@ import { assert, describe, it } from 'vitest'
 import { AppLoader, ServiceLoader } from '../src/index.js'
 import { makeApp } from './utils.js'
 
-const testFunc = () => {}
-
 describe('appLoader.test', () => {
   const app = makeApp()
   it('creates an AppLoader', () => {
@@ -37,14 +35,12 @@ describe('appLoader.test', () => {
       maxBatchSize: 10,
       services: {
         posts: {
-          maxBatchSize: 1,
-          cacheKeyFn: testFunc
+          maxBatchSize: 1
         }
       }
     })
     const serviceLoader = appLoader.service('posts')
-    assert.equal(serviceLoader.options.loaderOptions.maxBatchSize, 1)
-    assert.strictEqual(serviceLoader.options.loaderOptions.cacheKeyFn, testFunc)
+    assert.equal(serviceLoader.options.maxBatchSize, 1)
   })
 
   it('creates a separate default cache params registry per service loader', () => {
@@ -61,11 +57,11 @@ describe('appLoader.test', () => {
     const appLoader = new AppLoader({
       app,
       maxBatchSize: 10,
-      cacheKeyFn: testFunc
+      services: { posts: { maxBatchSize: undefined } }
     })
     const serviceLoader = appLoader.service('posts')
-    assert.equal(serviceLoader.options.loaderOptions.maxBatchSize, 10)
-    assert.strictEqual(serviceLoader.options.loaderOptions.cacheKeyFn, testFunc)
+    assert.equal(serviceLoader.options.maxBatchSize, 10)
+    assert.equal(appLoader.service('comments').options.maxBatchSize, 10)
   })
 
   it('ignores removed global and service cacheParamsFn overrides', async () => {
@@ -84,10 +80,54 @@ describe('appLoader.test', () => {
 
     for (const path of ['posts', 'comments']) {
       const serviceLoader = appLoader.service(path)
-      assert.notProperty(serviceLoader.options.loaderOptions, 'cacheParamsFn')
+      assert.notStrictEqual(serviceLoader.options.cacheParamsFn, globalOverride)
+      assert.notStrictEqual(serviceLoader.options.cacheParamsFn, serviceOverride)
       assert.isString(serviceLoader.options.cacheParamsFn({ tenant: 1 }))
       await serviceLoader.load(path === 'posts' ? 1 : 11)
     }
+  })
+
+  it.each(['global', 'service'] as const)('ignores removed %s loader options', async (scope) => {
+    const app = makeApp()
+    const unsupported = () => {
+      throw new Error('Removed loader options must not run')
+    }
+    const appLoader =
+      scope === 'global'
+        ? new AppLoader({
+            app,
+            // @ts-expect-error The removed global option must be ignored at runtime.
+            cache: false,
+            batch: false,
+            cacheKeyFn: unsupported,
+            batchScheduleFn: unsupported,
+            name: 'ignored'
+          })
+        : new AppLoader({
+            app,
+            services: {
+              posts: {
+                // @ts-expect-error The removed per-service option must be ignored at runtime.
+                cache: false,
+                batch: false,
+                cacheKeyFn: unsupported,
+                batchScheduleFn: unsupported,
+                name: 'ignored'
+              }
+            }
+          })
+    const loader = appLoader.service('posts')
+    let calls = 0
+    const params = {
+      callback: async () => {
+        calls++
+      }
+    }
+    const [first] = await Promise.all([loader.load(1, params), loader.load(2, params)])
+    const results = (await loader.load([1, 2], params)) as unknown[]
+
+    assert.strictEqual(results[0], first)
+    assert.equal(calls, 1)
   })
 
   it('clears all loaders', async () => {

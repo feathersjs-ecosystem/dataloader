@@ -14,9 +14,10 @@ import type { Params, ResultWithId, ServiceResult } from './utils.js'
 export type LoadMethod = 'load' | '_load'
 
 /** Options shared by all batches belonging to a service loader. */
-export interface ServiceLoaderOptions extends Omit<DataLoader.Options<unknown, unknown>, 'cacheMap'> {
+export interface ServiceLoaderOptions {
   app: Pick<Application, 'service'>
   serviceName: string
+  maxBatchSize?: number
 }
 
 interface LoaderState {
@@ -44,7 +45,7 @@ interface SharedLoaderOptions {
   service: LoaderService
   key: string
   cacheParamsFn: InternalCacheParamsFn
-  loaderOptions: DataLoader.Options<unknown, unknown>
+  maxBatchSize?: number
   loaders: Map<string, DataLoader<unknown, unknown>>
   cacheMap: Map<string, Promise<unknown>>
 }
@@ -52,7 +53,7 @@ interface SharedLoaderOptions {
 interface CreateDataLoaderOptions {
   service: LoaderService
   key: string
-  loaderOptions: DataLoader.Options<unknown, unknown>
+  maxBatchSize?: number
   multi: boolean
   method: LoadMethod
   params: Params
@@ -66,14 +67,7 @@ class CacheReference {
   constructor(readonly reference: string) {}
 }
 
-const createDataLoader = ({
-  service,
-  key,
-  loaderOptions,
-  multi,
-  method,
-  params
-}: CreateDataLoaderOptions) => {
+const createDataLoader = ({ service, key, maxBatchSize, multi, method, params }: CreateDataLoaderOptions) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
   const methodFn = service[serviceMethod]
   if (!methodFn) {
@@ -82,11 +76,14 @@ const createDataLoader = ({
     )
   }
   const getResults = multi ? uniqueResultsMulti : uniqueResults
-  return new DataLoader(async (keys: readonly unknown[]) => {
-    const query = { ...params.query, [key]: { $in: uniqueKeys([...keys]) } }
-    const result = await methodFn.call(service, { ...params, paginate: false, query })
-    return getResults([...keys], result, key)
-  }, loaderOptions)
+  return new DataLoader<unknown, unknown>(
+    async (keys: readonly unknown[]) => {
+      const query = { ...params.query, [key]: { $in: uniqueKeys([...keys]) } }
+      const result = await methodFn.call(service, { ...params, paginate: false, query })
+      return getResults([...keys], result, key)
+    },
+    { maxBatchSize, cacheKeyFn: defaultCacheKeyFn }
+  )
 }
 
 const stringifyKey = (options: ExecOptions, cacheParamsFn: InternalCacheParamsFn): string => {
@@ -242,24 +239,21 @@ export class ServiceLoader {
       return
     }
 
-    const { app, serviceName, ...loaderOptions } = options
+    const { app, serviceName, maxBatchSize } = options
     const service = app.service(serviceName) as LoaderService
     this.options = {
       app,
       service,
       key: (service.options && service.options.id) || 'id',
       cacheParamsFn: createDefaultCacheParamsFn(),
-      loaderOptions: _.assign(
-        { cacheKeyFn: defaultCacheKeyFn },
-        _.omit(loaderOptions, ['cacheMap', 'cacheParamsFn'])
-      ),
+      maxBatchSize,
       loaders: new Map(),
       cacheMap: new Map()
     }
   }
 
   async exec(opts: ExecOptions = {}): Promise<unknown> {
-    const { service, loaderOptions, cacheParamsFn, cacheMap, loaders } = this.options
+    const { service, maxBatchSize, cacheParamsFn, cacheMap, loaders } = this.options
 
     const execOptions = _.assign(
       {
@@ -297,7 +291,7 @@ export class ServiceLoader {
     if (!dataLoader) {
       dataLoader = createDataLoader({
         service,
-        loaderOptions,
+        maxBatchSize,
         ...loaderConfig
       })
 

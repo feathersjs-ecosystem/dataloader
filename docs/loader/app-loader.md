@@ -20,11 +20,11 @@ const loader = new AppLoader({
 })
 ```
 
-| Option                    | Required | Description                                                                                                                                                                    |
-| ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `app`                     | Yes      | A Feathers application with a `service(name)` method.                                                                                                                          |
-| `services`                | No       | Options by service name, overriding the global loader options. Defaults to `{}`.                                                                                               |
-| Additional loader options | No       | Options passed to each service's underlying DataLoaders, such as `maxBatchSize`, `batchScheduleFn`, or `cacheKeyFn`. See [ServiceLoader options](./service-loader.md#options). |
+| Option         | Default    | Description                                                       |
+| -------------- | ---------- | ----------------------------------------------------------------- |
+| `app`          | Required   | A Feathers application.                                           |
+| `services`     | `{}`       | Per-service `maxBatchSize` settings, overriding the global value. |
+| `maxBatchSize` | `Infinity` | Maximum number of keys per batch.                                 |
 
 ## service(serviceName)
 
@@ -53,7 +53,7 @@ Use `loader.service('users').clear()` to clear just one service.
 
 ## TypeScript
 
-`AppLoaderOptions` describes constructor options. `ServiceConfig` describes global and per-service loader options.
+`AppLoaderOptions` describes constructor options. `ServiceConfig` contains the optional `maxBatchSize` setting.
 
 ```ts
 import { AppLoader, type AppLoaderOptions } from 'feathers-dataloader'

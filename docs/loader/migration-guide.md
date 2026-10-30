@@ -38,7 +38,7 @@ loader.service('comments').key('postId').multi().load(postId, params)
 
 ## Removed configuration
 
-Remove `cacheMap` and `cacheParamsFn` overrides, including per-call overrides. Params are now handled automatically, including custom params, callbacks, and transactions.
+`maxBatchSize` is the only remaining loader setting. Remove `batch`, `batchScheduleFn`, `cache`, `cacheKeyFn`, `name`, `cacheMap`, and `cacheParamsFn` options, including per-call `cacheParamsFn` overrides. Params are handled automatically, including custom params, callbacks, and transactions.
 
 Remove custom loader-class options (`BaseLoader` or `ServiceLoader`) from `AppLoader`. For custom batch functions, use [DataLoader](./loader-utils.md) directly.
 

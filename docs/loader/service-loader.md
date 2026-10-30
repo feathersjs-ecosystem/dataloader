@@ -20,18 +20,11 @@ const users = new ServiceLoader({
 
 ### Options
 
-| Option            | Default             | Description                                                             |
-| ----------------- | ------------------- | ----------------------------------------------------------------------- |
-| `app`             | Required            | A Feathers application.                                                 |
-| `serviceName`     | Required            | Name passed to `app.service()`.                                         |
-| `maxBatchSize`    | `Infinity`          | Maximum number of keys per batch.                                       |
-| `batch`           | `true`              | Whether to batch keys.                                                  |
-| `batchScheduleFn` | DataLoader default  | Controls when a batch runs.                                             |
-| `cache`           | `true`              | Enables DataLoader's memoization; service-loader caching still applies. |
-| `cacheKeyFn`      | `defaultCacheKeyFn` | Converts IDs to DataLoader cache keys.                                  |
-| `name`            | `null`              | Optional DataLoader name.                                               |
-
-See [DataLoader options](https://github.com/graphql/dataloader#new-dataloaderbatchloadfn--options) for details.
+| Option         | Default    | Description                       |
+| -------------- | ---------- | --------------------------------- |
+| `app`          | Required   | A Feathers application.           |
+| `serviceName`  | Required   | Name passed to `app.service()`.   |
+| `maxBatchSize` | `Infinity` | Maximum number of keys per batch. |
 
 ## load(id, params = {})
 

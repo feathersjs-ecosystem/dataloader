@@ -50,7 +50,6 @@ describe('serviceLoader.test', () => {
       cacheParamsFn: testFunc
     })
     assert.notStrictEqual(serviceLoader.options.cacheParamsFn, testFunc)
-    assert.notProperty(serviceLoader.options.loaderOptions, 'cacheParamsFn')
   })
 
   describe('default cache params', () => {
@@ -177,6 +176,25 @@ describe('serviceLoader.test', () => {
       assert.equal(cacheMap.size, 0)
     })
 
+    it.each([false, true])('ignores the removed cache option set to %s', async (cache) => {
+      const configured = new ServiceLoader({
+        app: loaderApp,
+        serviceName: 'posts',
+        // @ts-expect-error The removed JS option must not reach DataLoader.
+        cache
+      })
+
+      const first = await configured.load(1)
+      const results = (await configured.load([1, 2])) as unknown[]
+
+      assert.notProperty(configured.options, 'cache')
+      assert.strictEqual(results[0], first)
+      assert.deepEqual(
+        calls.map((params) => params.query.id!.$in),
+        [[1], [2]]
+      )
+    })
+
     it('batches equivalent nested data while preserving original service params', async () => {
       const callback = () => {}
       const first = {
@@ -262,15 +280,32 @@ describe('serviceLoader.test', () => {
     })
   })
 
-  it('passes loader options', async () => {
+  it('only forwards maxBatchSize and keeps default batching and caching', async () => {
+    const calls: unknown[][] = []
+    const find = async (params: BatchParams) => {
+      const ids = params.query.id!.$in
+      calls.push(ids)
+      return ids.map((id) => ({ id }))
+    }
+    const unsupported = () => {
+      throw new Error('Removed loader options must not run')
+    }
     const serviceLoader = new ServiceLoader({
-      app,
+      app: mockApp({ find }),
       serviceName: 'posts',
-      cacheKeyFn: testFunc
+      maxBatchSize: 2,
+      // @ts-expect-error DataLoader options other than maxBatchSize are removed.
+      batch: false,
+      cache: false,
+      cacheKeyFn: unsupported,
+      batchScheduleFn: unsupported,
+      name: 'ignored'
     })
-    await serviceLoader.load(1)
-    const [dataLoader] = serviceLoader.options.loaders.values()
-    assert.deepEqual((dataLoader as unknown as { _cacheKeyFn: unknown })._cacheKeyFn, testFunc)
+
+    const results = await Promise.all([serviceLoader.load(1), serviceLoader.load(2), serviceLoader.load(3)])
+    assert.deepEqual(results, [{ id: 1 }, { id: 2 }, { id: 3 }])
+    assert.deepEqual(await serviceLoader.load([1, 2, 3]), results)
+    assert.deepEqual(calls, [[1, 2], [3]])
   })
 
   it('works with load(id)', async () => {
@@ -713,16 +748,11 @@ describe('serviceLoader.test', () => {
       assert.deepEqual(calls[0]!.query.group!.$in, ['a', 'b'])
     })
 
-    it('preserves batch size and custom cache key options on derived handles', async () => {
-      const cacheKeys: unknown[] = []
+    it('preserves maxBatchSize and default ID caching on derived handles', async () => {
       const configured = new ServiceLoader({
         app: loaderApp,
         serviceName: 'records',
-        maxBatchSize: 1,
-        cacheKeyFn: (id) => {
-          cacheKeys.push(id)
-          return String(id)
-        }
+        maxBatchSize: 1
       })
       const derived = configured.multi().key('id')
       const results = await derived.load([1, 2, 3])
@@ -733,7 +763,6 @@ describe('serviceLoader.test', () => {
       )
       assert.lengthOf(calls, 3)
       calls.forEach((params) => assert.lengthOf(params.query.id!.$in, 1))
-      assert.includeMembers(cacheKeys, [1, 2, 3])
       assert.deepEqual(await derived.load('1'), [records[0]])
       assert.lengthOf(calls, 3)
     })

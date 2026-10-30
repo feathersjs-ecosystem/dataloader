@@ -4,6 +4,7 @@
 
 ### Breaking changes
 
+- Limit AppLoader and ServiceLoader configuration to `maxBatchSize`; remove other DataLoader options.
 - Remove service-loader `get`, `_get`, `find`, and `_find` methods. Use `load`/`_load` for relationship lookups or call the Feathers service directly.
 - Make `multi()` take no arguments. Use `.key(field).multi()` to select a relationship field.
 - Remove custom `cacheMap`, `cacheParamsFn`, and AppLoader base-class configuration, and the old cache-params types/default function exports.

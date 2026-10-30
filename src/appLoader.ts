@@ -13,21 +13,25 @@ export class AppLoader {
   options: {
     app: ServiceLoaderOptions['app']
     services: Record<string, ServiceConfig>
-    loaderOptions: ServiceConfig
+    maxBatchSize?: number
     loaders: Map<string, ServiceLoader>
   }
 
-  constructor({ app, services = {}, ...loaderOptions }: AppLoaderOptions) {
-    this.options = { app, services, loaderOptions, loaders: new Map() }
+  constructor({ app, services = {}, maxBatchSize }: AppLoaderOptions) {
+    this.options = { app, services, maxBatchSize, loaders: new Map() }
   }
 
   service(serviceName: string): ServiceLoader {
-    const { app, services, loaderOptions, loaders } = this.options
+    const { app, services, maxBatchSize, loaders } = this.options
     const cachedLoader = loaders.get(serviceName)
     if (cachedLoader) {
       return cachedLoader
     }
-    const loader = new ServiceLoader({ ...loaderOptions, ...services[serviceName], serviceName, app })
+    const loader = new ServiceLoader({
+      app,
+      serviceName,
+      maxBatchSize: services[serviceName]?.maxBatchSize ?? maxBatchSize
+    })
     loaders.set(serviceName, loader)
     return loader
   }
