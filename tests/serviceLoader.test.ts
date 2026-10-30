@@ -97,7 +97,109 @@ describe('serviceLoader.test', () => {
       serviceLoader = new ServiceLoader({ app: loaderApp, serviceName: 'posts' })
     })
 
-    it('batches equivalent queries and forwards original runtime references', async () => {
+    it.each(['load', '_load'] as const)(
+      'snapshots mutable params for %s before dispatch and later batches',
+      async (method) => {
+        const calls: Params[] = []
+        const find = async (params: BatchParams) => {
+          calls.push(params)
+          return params.query.id!.$in.map((id) => ({ id }))
+        }
+        const loader = new ServiceLoader({ app: mockApp({ find, _find: find }), serviceName: 'records' })
+        const params = { provider: 'rest', query: { active: true, nested: { tags: ['initial'] } } }
+        const pending = loader[method](1, params)
+        params.provider = 'socketio'
+        params.query.active = false
+        params.query.nested.tags.push('changed')
+        await pending
+
+        await loader[method](2, { provider: 'rest', query: { active: true, nested: { tags: ['initial'] } } })
+        assert.lengthOf(calls, 2)
+        calls.forEach((params, index) => {
+          assert.equal(params.provider, 'rest')
+          assert.deepEqual(params.query, {
+            active: true,
+            nested: { tags: ['initial'] },
+            id: { $in: [index + 1] }
+          })
+        })
+        assert.equal(loader.options.loaders.size, 1)
+      }
+    )
+
+    it('snapshots dates while preserving callbacks and opaque instances', async () => {
+      class Transaction {}
+      const transaction = new Transaction()
+      const callback = () => {}
+      const date = new Date('2020-01-01T00:00:00Z')
+      const params = { query: { after: date }, adapter: { date, transaction, callback } }
+      const pending = serviceLoader.load(1, params)
+      date.setUTCFullYear(2030)
+      await pending
+
+      const after = calls[0]!.query.after as unknown as Date
+      const adapter = calls[0]!.adapter as typeof params.adapter
+      assert.notStrictEqual(after, date)
+      assert.equal(after.toISOString(), '2020-01-01T00:00:00.000Z')
+      assert.strictEqual(adapter.date, after)
+      assert.strictEqual(adapter.transaction, transaction)
+      assert.strictEqual(adapter.callback, callback)
+    })
+
+    it('clones cyclic plain params, shared objects, sparse arrays, symbols, and null prototypes', async () => {
+      const shared = { value: 'original' }
+      const symbol = Symbol('metadata')
+      const metadata = Object.create(null) as Record<PropertyKey, unknown>
+      const items = new Array<unknown>(3)
+      items[1] = shared
+      items[2] = metadata
+      Object.assign(metadata, { first: shared, second: shared, self: metadata, items, [symbol]: shared })
+      Object.defineProperty(metadata, '__proto__', { value: shared, enumerable: true })
+      const pending = serviceLoader.load(1, { metadata })
+      shared.value = 'changed'
+      await pending
+
+      const copy = calls[0]!.metadata as typeof metadata
+      const copiedItems = copy.items as unknown[]
+      assert.notStrictEqual(copy, metadata)
+      assert.isNull(Object.getPrototypeOf(copy))
+      assert.strictEqual(copy.self, copy)
+      assert.strictEqual(copy.first, copy.second)
+      assert.strictEqual(copy[symbol], copy.first)
+      assert.strictEqual(copy.__proto__, copy.first)
+      assert.deepEqual(copy.first, { value: 'original' })
+      assert.lengthOf(copiedItems, 3)
+      assert.isFalse(Object.hasOwn(copiedItems, 0))
+      assert.strictEqual(copiedItems[1], copy.first)
+      assert.strictEqual(copiedItems[2], copy)
+      assert.strictEqual(metadata.self, metadata)
+      assert.strictEqual(items[2], metadata)
+    })
+
+    it('keeps service mutations separate from the saved params and the caller', async () => {
+      const seen: unknown[] = []
+      const find = async (params: BatchParams) => {
+        const nested = params.query.nested as unknown as { tags: string[] }
+        const adapter = params.adapter as { tenant: string }
+        seen.push({ tags: [...nested.tags], tenant: adapter.tenant })
+        nested.tags.push('changed by hook')
+        adapter.tenant = 'changed by hook'
+        return params.query.id!.$in.map((id) => ({ id }))
+      }
+      const loader = new ServiceLoader({ app: mockApp({ find }), serviceName: 'records' })
+      const params = { query: { nested: { tags: ['initial'] } }, adapter: { tenant: 'initial' } }
+      await loader.load(1, params)
+      await loader.load(2, params)
+
+      assert.deepEqual(seen, [
+        { tags: ['initial'], tenant: 'initial' },
+        { tags: ['initial'], tenant: 'initial' }
+      ])
+      assert.deepEqual(params, { query: { nested: { tags: ['initial'] } }, adapter: { tenant: 'initial' } })
+      assert.equal(loader.options.loaders.size, 1)
+    })
+
+    it('batches equivalent queries while cloning plain data and preserving runtime references', async () => {
       const transaction: Record<string, unknown> = {}
       transaction.self = transaction
       const callback = () => {}
@@ -120,7 +222,8 @@ describe('serviceLoader.test', () => {
       )
       assert.lengthOf(calls, 1)
       assert.deepEqual(calls[0]!.query.id!.$in, [1, 2])
-      assert.strictEqual(calls[0]!.transaction, transaction)
+      assert.notStrictEqual(calls[0]!.transaction, transaction)
+      assert.strictEqual((calls[0]!.transaction as Record<string, unknown>).self, calls[0]!.transaction)
       assert.strictEqual(calls[0]!.callback, callback)
       assert.strictEqual(calls[0]!.loader, first.loader)
       assert.deepEqual(first.query, { active: true, tenant: 1 })
@@ -224,7 +327,7 @@ describe('serviceLoader.test', () => {
       )
     })
 
-    it('batches equivalent nested data while preserving original service params', async () => {
+    it('batches equivalent nested data while copying plain params and preserving callbacks', async () => {
       const callback = () => {}
       const first = {
         query: { active: true, nested: { callback } },
@@ -237,8 +340,14 @@ describe('serviceLoader.test', () => {
 
       await Promise.all([serviceLoader.load(1, first), serviceLoader.load(2, second)])
       assert.lengthOf(calls, 1)
-      assert.strictEqual(calls[0]!.adapter, first.adapter)
-      assert.strictEqual<unknown>(calls[0]!.query.nested, first.query.nested)
+      assert.notStrictEqual(calls[0]!.adapter, first.adapter)
+      assert.deepEqual(calls[0]!.adapter, first.adapter)
+      assert.notStrictEqual<unknown>(calls[0]!.query.nested, first.query.nested)
+      assert.deepEqual<unknown>(calls[0]!.query.nested, first.query.nested)
+      assert.strictEqual(
+        (calls[0]!.query.nested as unknown as { callback: typeof callback }).callback,
+        callback
+      )
 
       const cached = (await serviceLoader.load(1, second)) as ResultWithId
       assert.equal(cached.id, 1)

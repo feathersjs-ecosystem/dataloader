@@ -66,6 +66,47 @@ class CacheReference {
   constructor(readonly reference: string) {}
 }
 
+const enumerableKeys = (value: object): PropertyKey[] => {
+  return Reflect.ownKeys(value).filter((key) => Object.prototype.propertyIsEnumerable.call(value, key))
+}
+
+const cloneParams = <T>(value: T, seen = new WeakMap<object, object>()): T => {
+  if (value === null || typeof value !== 'object') {
+    return value
+  }
+
+  const existing = seen.get(value)
+  if (existing) {
+    return existing as T
+  }
+
+  if (value instanceof Date) {
+    const copy = new Date(value.getTime())
+    seen.set(value, copy)
+    return copy as T
+  }
+
+  if (!Array.isArray(value) && !_.isObject(value) && Object.getPrototypeOf(value) !== null) {
+    return value
+  }
+
+  const copy: object = Array.isArray(value)
+    ? new Array(value.length)
+    : Object.create(Object.getPrototypeOf(value))
+
+  seen.set(value, copy)
+
+  for (const key of enumerableKeys(value)) {
+    Object.defineProperty(copy, key, {
+      value: cloneParams((value as Record<PropertyKey, unknown>)[key], seen),
+      enumerable: true,
+      writable: true,
+      configurable: true
+    })
+  }
+  return copy as T
+}
+
 const createDataLoader = ({ service, key, maxBatchSize, multi, method, params }: CreateDataLoaderOptions) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
   const methodFn = service[serviceMethod]
@@ -74,11 +115,15 @@ const createDataLoader = ({ service, key, maxBatchSize, multi, method, params }:
       `Cannot create a loader for a service that does not have a ${serviceMethod} method.`
     )
   }
+  // Clone the params in case the caller mutates them after creating the loader
+  const paramsSnapshot = cloneParams(params)
   const getResults = multi ? uniqueResultsMulti : uniqueResults
   return new DataLoader<unknown, unknown>(
     async (values: readonly unknown[]) => {
-      const query = { ...params?.query, [key]: { $in: uniqueKeys([...values]) } }
-      const result = await methodFn.call(service, { ...params, paginate: false, query })
+      // Clone again in case the methodFn mutates the params
+      const batchParams = cloneParams(paramsSnapshot)
+      const query = { ...batchParams?.query, [key]: { $in: uniqueKeys([...values]) } }
+      const result = await methodFn.call(service, { ...batchParams, paginate: false, query })
       return getResults([...values], result, key)
     },
     { maxBatchSize, cacheKeyFn: defaultCacheKeyFn }
@@ -90,10 +135,6 @@ const stringifyKey = (options: Omit<ExecOptions, 'value'>, cacheParamsFn: Intern
 }
 
 const createDefaultCacheParamsFn = (): InternalCacheParamsFn => {
-  const enumerableKeys = (value: object): PropertyKey[] => {
-    return Reflect.ownKeys(value).filter((key) => Object.prototype.propertyIsEnumerable.call(value, key))
-  }
-
   // The extra encoder is protecting distinctions that ordinary JSON loses: undefined versus missing properties,
   // NaN versus null, symbols, bigint, and generated tokens versus similarly shaped user data.
   const encodeCacheValue = (value: unknown, reference: (value: unknown) => CacheReference): unknown[] => {

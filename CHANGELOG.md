@@ -22,6 +22,7 @@
 - Keep derived `key()` and `multi()` handles independent while sharing service cache state.
 - Remove the separate service result cache and use DataLoader's per-value caching for pending requests, records, and missing results.
 - Allow retrying failed loads while reusing successful results.
+- Snapshot arrays, plain objects, and dates in params so caller or hook mutations cannot change later batches. Keep callbacks and opaque instances by reference.
 - Preserve nested callbacks, transactions, dates, circular references, and special primitive values when calculating cache identity without mutating service params.
 
 ---
