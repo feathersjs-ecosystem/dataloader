@@ -51,6 +51,10 @@ loader.clear() // Every service
 
 Existing service loaders can continue to be used after clearing.
 
+## Retrying failed loads
+
+Call `load()` or `_load()` again to retry a failed request; calling `clear()` first is unnecessary. For array loads, failed keys are retried while successful results remain cached.
+
 ## Query filters
 
 `$limit`, `$skip`, and `$sort` cause an error in both load methods. `$limit` is no longer silently removed. Call the service directly when you need these filters.

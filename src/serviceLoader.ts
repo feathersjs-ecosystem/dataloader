@@ -310,7 +310,26 @@ export class ServiceLoader {
 
     cacheMap.set(cacheKey, promise)
 
-    return promise
+    const evict = () => {
+      if (cacheMap.get(cacheKey) === promise) {
+        cacheMap.delete(cacheKey)
+      }
+    }
+
+    try {
+      const result = await promise
+      if (
+        Array.isArray(execOptions.id) &&
+        Array.isArray(result) &&
+        result.some((item) => item instanceof Error)
+      ) {
+        evict()
+      }
+      return result
+    } catch (error) {
+      evict()
+      throw error
+    }
   }
 
   load(id: unknown, params?: Params): Promise<unknown> {

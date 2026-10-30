@@ -16,6 +16,7 @@
 
 - Keep derived `key()` and `multi()` handles independent while sharing service cache state.
 - Cache promises and missing results consistently using private in-memory maps.
+- Evict failed loads and arrays containing errors so callers can retry while reusing successful results.
 - Preserve nested callbacks, transactions, dates, circular references, and special primitive values when calculating cache identity without mutating service params.
 
 ---

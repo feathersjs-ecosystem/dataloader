@@ -501,6 +501,108 @@ describe('serviceLoader.test', () => {
       assert.strictEqual(loader.options.cacheMap.values().next().value, cachedPromise)
     })
 
+    it.each(['load', '_load'] as const)('allows retrying a failed %s request', async (method) => {
+      const failure = new Error('Temporary failure')
+      let calls = 0
+      const find = async () => {
+        calls++
+        if (calls === 1) {
+          throw failure
+        }
+        return [{ id: 1 }]
+      }
+      const loader = new ServiceLoader({ app: mockApp({ find, _find: find }), serviceName: 'posts' })
+
+      const results = await Promise.allSettled([loader[method](1), loader[method](1)])
+      assert.deepEqual(results, [
+        { status: 'rejected', reason: failure },
+        { status: 'rejected', reason: failure }
+      ])
+      assert.equal(calls, 1)
+      assert.equal(loader.options.cacheMap.size, 0)
+
+      const fresh = await loader[method](1)
+      assert.deepEqual(fresh, { id: 1 })
+      assert.strictEqual(await loader[method](1), fresh)
+      assert.equal(calls, 2)
+    })
+
+    it.each(['load', '_load'] as const)(
+      'retries failed array keys through %s while reusing successful keys',
+      async (method) => {
+        const failure = new Error('Temporary failure')
+        const calls: unknown[][] = []
+        let failed = false
+        const find = async (params: BatchParams) => {
+          const ids = params.query.id!.$in
+          calls.push(ids)
+          if (ids.includes(2) && !failed) {
+            failed = true
+            throw failure
+          }
+          return ids.map((id) => ({ id }))
+        }
+        const loader = new ServiceLoader({
+          app: mockApp({ find, _find: find }),
+          serviceName: 'posts',
+          maxBatchSize: 1
+        })
+
+        const first = (await loader[method]([2, 1])) as unknown[]
+        assert.deepEqual(first, [{ id: 1 }, failure])
+        assert.strictEqual(first[1], failure)
+        assert.equal(loader.options.cacheMap.size, 0)
+
+        const fresh = (await loader[method]([1, 2])) as unknown[]
+        assert.deepEqual(fresh, [{ id: 1 }, { id: 2 }])
+        assert.strictEqual(fresh[0], first[0])
+        assert.strictEqual(await loader[method]([2, 1]), fresh)
+        assert.deepEqual(calls, [[1], [2], [2]])
+      }
+    )
+
+    it.each([{ id: 1 }, { id: [1] }])(
+      'keeps newer cached results when an old request for $id fails after clear()',
+      async ({ id }) => {
+        const failure = new Error('Old request failed')
+        let rejectOld!: (error: Error) => void
+        let markStarted!: () => void
+        let calls = 0
+        const started = new Promise<void>((resolve) => {
+          markStarted = resolve
+        })
+        const find = () => {
+          calls++
+          if (calls === 1) {
+            markStarted()
+            return new Promise<ResultWithId[]>((_resolve, reject) => {
+              rejectOld = reject
+            })
+          }
+          return Promise.resolve([{ id: 1, body: 'fresh' }])
+        }
+        const loader = new ServiceLoader({ app: mockApp({ find }), serviceName: 'posts' })
+        const old = loader.load(id).catch((error: unknown) => error)
+        await started
+
+        loader.clear()
+        const fresh = await loader.load(id)
+        const [freshPromise] = loader.options.cacheMap.values()
+
+        rejectOld(failure)
+        const oldResult = await old
+        if (Array.isArray(id)) {
+          assert.deepEqual(oldResult, [failure])
+        } else {
+          assert.strictEqual(oldResult, failure)
+        }
+        assert.equal(loader.options.cacheMap.size, 1)
+        assert.strictEqual(loader.options.cacheMap.values().next().value, freshPromise)
+        assert.strictEqual(await loader.load(id), fresh)
+        assert.equal(calls, 2)
+      }
+    )
+
     it('clears a pending request without waiting for or cancelling it', async () => {
       let resolveOld!: (value: ResultWithId[]) => void
       let markStarted!: () => void
