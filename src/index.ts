@@ -10,8 +10,8 @@ export { uniqueKeys, uniqueResults, uniqueResultsMulti }
 export * from './utils.js'
 
 export type { AppLoaderOptions, ServiceConfig } from './appLoader.js'
-export type { ServiceLoaderOptions, CacheMap, LoadMethod } from './serviceLoader.js'
-export type { Params, CacheParams, CacheParamsFn, ResultWithId, ServiceResult } from './utils.js'
+export type { ServiceLoaderOptions, LoadMethod } from './serviceLoader.js'
+export type { Params, ResultWithId, ServiceResult } from './utils.js'
 
 export default {
   AppLoader,

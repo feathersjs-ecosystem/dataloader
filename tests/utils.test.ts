@@ -4,9 +4,8 @@ import {
   uniqueResults,
   uniqueResultsMulti,
   stableStringify,
-  defaultCacheParamsFn,
   defaultCacheKeyFn
-} from './utils.js'
+} from '../src/utils.js'
 
 describe('utils.test', () => {
   it('uniqueKeys dedupes keys', () => {
@@ -133,20 +132,7 @@ describe('utils.test', () => {
     expect(defaultCacheKeyFn(1)).toEqual('1')
     expect(defaultCacheKeyFn('1')).toEqual('1')
     expect(defaultCacheKeyFn(_id)).toEqual('1')
-  })
-
-  it('defaultCacheParamsFn only returns valid props', () => {
-    const safeParams = {
-      provider: 'rest',
-      authentication: { prop: 1 },
-      user: { prop: 1 },
-      query: { prop: 1 }
-    }
-    const params = {
-      ...safeParams,
-      otherProp: 'otherProp'
-    }
-    const cacheParams = defaultCacheParamsFn(params)
-    expect(cacheParams).toEqual(safeParams)
+    expect(defaultCacheKeyFn(0)).toBe(0)
+    expect(defaultCacheKeyFn('')).toBe('')
   })
 })

@@ -2,88 +2,68 @@ import { GeneralError } from '@feathersjs/errors'
 import DataLoader from 'dataloader'
 import {
   stableStringify,
-  defaultCacheParamsFn,
   defaultCacheKeyFn,
   uniqueKeys,
   uniqueResults,
   uniqueResultsMulti,
-  Params,
-  CacheParamsFn,
-  ResultWithId
+  _
 } from './utils.js'
-import type { Application, Service } from '@feathersjs/feathers'
+import type { Application } from '@feathersjs/feathers'
+import type { Params, ResultWithId, ServiceResult } from './utils.js'
 
-/** Available loader methods */
-export type LoadMethod = 'get' | '_get' | 'find' | '_find' | 'load' | '_load'
+export type LoadMethod = 'load' | '_load'
 
-/**
- * Interface for cache storage implementations.
- * Compatible with Map and async cache stores like Redis.
- */
-export interface CacheMap<K = string, V = unknown> {
-  get(key: K): V | undefined | Promise<V | undefined>
-  set(key: K, value: V): unknown
-  delete(key: K): unknown
-  clear(): unknown
-  keys(): Iterable<K> | AsyncIterable<K>
+/** Options shared by all batches belonging to a service loader. */
+export interface ServiceLoaderOptions extends Omit<DataLoader.Options<unknown, unknown>, 'cacheMap'> {
+  app: Pick<Application, 'service'>
+  serviceName: string
 }
 
-/** Options for configuring a ServiceLoader instance */
-export interface ServiceLoaderOptions {
-  /** The Feathers application instance */
-  app: Application
-  /** Name of the service to load from */
-  serviceName: string
-  /** Custom function to extract cache-relevant params */
-  cacheParamsFn?: CacheParamsFn
-  /** Custom cache storage implementation */
-  cacheMap?: CacheMap
-  /** Custom function to generate cache keys */
-  cacheKeyFn?: (key: unknown) => string
-  [key: string]: unknown
+interface LoaderState {
+  key?: string
+  multi?: boolean
+}
+
+interface ExecOptions extends LoaderState {
+  id?: unknown
+  params?: Params
+  method?: LoadMethod
+}
+
+type InternalCacheParamsFn = (params?: Params | null) => string
+
+type FindMethod = (params: Params) => Promise<ServiceResult<ResultWithId>>
+interface LoaderService {
+  options?: { id?: string }
+  find?: FindMethod
+  _find?: FindMethod
+}
+
+interface SharedLoaderOptions {
+  app: ServiceLoaderOptions['app']
+  service: LoaderService
+  key: string
+  cacheParamsFn: InternalCacheParamsFn
+  loaderOptions: DataLoader.Options<unknown, unknown>
+  loaders: Map<string, DataLoader<unknown, unknown>>
+  cacheMap: Map<string, Promise<unknown>>
 }
 
 interface CreateDataLoaderOptions {
-  service: Service
+  service: LoaderService
   key: string
   loaderOptions: DataLoader.Options<unknown, unknown>
   multi: boolean
   method: LoadMethod
-  params?: Params
+  params: Params
 }
 
-interface ExecOptions {
-  id?: unknown
-  key?: string
-  params?: Params
-  multi?: boolean
-  method?: LoadMethod
-  cacheParamsFn?: CacheParamsFn
-}
+const filters = ['$skip', '$sort', '$limit']
 
-/** Methods returned by key() and multi() for chained loading */
-interface KeyLoadMethods {
-  load: (id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn) => Promise<unknown>
-  _load: (id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn) => Promise<unknown>
-}
+let nextCacheParamsScope = 0
 
-/** Service method signature for find/get operations */
-type ServiceMethod = (arg1?: unknown, arg2?: unknown) => Promise<unknown>
-
-/** Service with optional method implementations */
-interface ServiceWithMethods {
-  find?: ServiceMethod
-  _find?: ServiceMethod
-  get?: ServiceMethod
-  _get?: ServiceMethod
-  [key: string]: ServiceMethod | unknown
-}
-
-/** Service with options property for accessing service configuration */
-interface ServiceWithOptions {
-  options?: {
-    id?: string
-  }
+class CacheReference {
+  constructor(readonly reference: string) {}
 }
 
 const createDataLoader = ({
@@ -92,244 +72,265 @@ const createDataLoader = ({
   loaderOptions,
   multi,
   method,
-  params = {}
+  params
 }: CreateDataLoaderOptions) => {
   const serviceMethod = method === '_load' ? '_find' : 'find'
-
-  const serviceWithMethod = service as unknown as ServiceWithMethods
-
-  const methodFn = serviceWithMethod[serviceMethod] as ServiceMethod | undefined
+  const methodFn = service[serviceMethod]
   if (!methodFn) {
     throw new GeneralError(
       `Cannot create a loader for a service that does not have a ${serviceMethod} method.`
     )
   }
-
   const getResults = multi ? uniqueResultsMulti : uniqueResults
-
   return new DataLoader(async (keys: readonly unknown[]) => {
-    const loaderParams: Params = {
-      ...params,
-      paginate: false,
-      query: {
-        ...params.query,
-        [key]: { $in: uniqueKeys([...keys]) }
-      }
-    }
-    if (loaderParams.query) {
-      delete loaderParams.query['$limit']
-    }
-    const result = await methodFn.call(service, loaderParams)
-    return getResults([...keys], result as ResultWithId[], key)
+    const query = { ...params.query, [key]: { $in: uniqueKeys([...keys]) } }
+    const result = await methodFn.call(service, { ...params, paginate: false, query })
+    return getResults([...keys], result, key)
   }, loaderOptions)
 }
 
-/**
- * Loader for a single Feathers service that batches and caches requests.
- */
-export class ServiceLoader {
-  cacheMap: CacheMap
-  loaders: Map<string, DataLoader<unknown, unknown>>
-  options: {
-    app: Application
-    serviceName: string
-    service: Service
-    key: string
-    cacheParamsFn: CacheParamsFn
-    loaderOptions: DataLoader.Options<unknown, unknown>
+const stringifyKey = (options: ExecOptions, cacheParamsFn: InternalCacheParamsFn): string => {
+  return stableStringify({ ...options, params: cacheParamsFn(options.params) })
+}
+
+const createDefaultCacheParamsFn = (): InternalCacheParamsFn => {
+  const enumerableKeys = (value: object): PropertyKey[] => {
+    return Reflect.ownKeys(value).filter((key) => Object.prototype.propertyIsEnumerable.call(value, key))
   }
 
-  constructor({ app, serviceName, cacheParamsFn, cacheMap, ...loaderOptions }: ServiceLoaderOptions) {
-    this.cacheMap = cacheMap || (new Map() as CacheMap)
-    this.loaders = new Map()
-    const service = app.service(serviceName)
-    const serviceWithOptions = service as unknown as ServiceWithOptions
-    const serviceOptions = serviceWithOptions.options
+  // The extra encoder is protecting distinctions that ordinary JSON loses: undefined versus missing properties,
+  // NaN versus null, symbols, bigint, and generated tokens versus similarly shaped user data.
+  const encodeCacheValue = (value: unknown, reference: (value: unknown) => CacheReference): unknown[] => {
+    if (value instanceof CacheReference) {
+      return ['reference', value.reference]
+    }
+
+    if (value === null) {
+      return ['null']
+    }
+
+    const type = typeof value
+
+    if (type === 'symbol') {
+      return ['symbol', reference(value).reference]
+    }
+
+    if (type === 'undefined') {
+      return ['undefined']
+    }
+
+    if (type === 'number' || type === 'bigint') {
+      return [type, Object.is(value, -0) ? '-0' : String(value)]
+    }
+
+    if (type === 'string' || type === 'boolean') {
+      return [type, value]
+    }
+
+    if (value instanceof Date) {
+      return ['date', String(value.getTime())]
+    }
+
+    if (Array.isArray(value)) {
+      return [
+        'array',
+        Array.from({ length: value.length }, (_value, index) => {
+          return _.has(value, [index]) ? encodeCacheValue(value[index], reference) : ['hole']
+        })
+      ]
+    }
+
+    const object = value as Record<PropertyKey, unknown>
+    const entries = enumerableKeys(object).map((key) => {
+      return [encodeCacheValue(key, reference), encodeCacheValue(object[key], reference)]
+    })
+
+    entries.sort((first, second) => {
+      const firstKey = JSON.stringify(first[0])!
+      const secondKey = JSON.stringify(second[0])!
+      return firstKey < secondKey ? -1 : firstKey > secondKey ? 1 : 0
+    })
+
+    return ['object', entries]
+  }
+
+  const scope = nextCacheParamsScope++
+  const references = new Map<unknown, CacheReference>()
+  const ignoredLoader = Symbol('ignored loader')
+
+  const reference = (value: unknown): CacheReference => {
+    if (!references.has(value)) {
+      references.set(value, new CacheReference(`${scope}:${references.size}`))
+    }
+
+    return references.get(value)!
+  }
+
+  const normalizeObject = (value: object, ancestors: Set<unknown>): Record<PropertyKey, unknown> => {
+    const object = value as Record<PropertyKey, unknown>
+    const entries: [PropertyKey, unknown][] = []
+    for (const key of enumerableKeys(value)) {
+      const normalized = normalize(object[key], ancestors)
+      if (normalized !== ignoredLoader) {
+        entries.push([key, normalized])
+      }
+    }
+    return Object.fromEntries(entries)
+  }
+
+  const normalize = (value: unknown, ancestors: Set<unknown>): unknown => {
+    if (value instanceof ServiceLoader) {
+      return ignoredLoader
+    }
+
+    if (typeof value === 'function') {
+      return reference(value)
+    }
+
+    if (value === null || typeof value !== 'object' || value instanceof Date) {
+      return value
+    }
+
+    if (ancestors.has(value)) {
+      return reference(value)
+    }
+
+    ancestors.add(value)
+
+    try {
+      if (Array.isArray(value)) {
+        return value.map((item) => {
+          const normalized = normalize(item, ancestors)
+          return normalized === ignoredLoader ? undefined : normalized
+        })
+      }
+
+      if (_.isObject(value) || Object.getPrototypeOf(value) === null) {
+        return normalizeObject(value, ancestors)
+      }
+
+      const serializable = value as { toJSON?: () => unknown }
+      if (typeof serializable.toJSON === 'function') {
+        return normalize(serializable.toJSON(), ancestors)
+      }
+
+      return reference(value)
+    } catch {
+      return reference(value)
+    } finally {
+      ancestors.delete(value)
+    }
+  }
+
+  const cacheParamsFn: InternalCacheParamsFn = (params = {}) => {
+    const normalized = normalizeObject(params || {}, new Set([params]))
+    return JSON.stringify(encodeCacheValue(normalized, reference))
+  }
+
+  return cacheParamsFn
+}
+
+export class ServiceLoader {
+  options: SharedLoaderOptions
+  state: LoaderState
+
+  constructor(options: ServiceLoaderOptions | ServiceLoader, state?: LoaderState) {
+    this.state = state || {}
+
+    if (options instanceof ServiceLoader) {
+      this.options = options.options
+      return
+    }
+
+    const { app, serviceName, ...loaderOptions } = options
+    const service = app.service(serviceName) as LoaderService
     this.options = {
       app,
-      serviceName,
       service,
-      key: (serviceOptions && serviceOptions.id) || 'id',
-      cacheParamsFn: cacheParamsFn || defaultCacheParamsFn,
-      loaderOptions: {
-        cacheKeyFn: defaultCacheKeyFn,
-        ...loaderOptions
-      }
+      key: (service.options && service.options.id) || 'id',
+      cacheParamsFn: createDefaultCacheParamsFn(),
+      loaderOptions: _.assign(
+        { cacheKeyFn: defaultCacheKeyFn },
+        _.omit(loaderOptions, ['cacheMap', 'cacheParamsFn'])
+      ),
+      loaders: new Map(),
+      cacheMap: new Map()
     }
   }
 
-  async exec({ cacheParamsFn, ...options }: ExecOptions = {}): Promise<unknown> {
-    const { service, loaderOptions } = this.options
+  async exec(opts: ExecOptions = {}): Promise<unknown> {
+    const { service, loaderOptions, cacheParamsFn, cacheMap, loaders } = this.options
 
-    const execOptions = {
-      id: null as unknown,
-      key: this.options.key,
-      params: undefined as Params | undefined,
-      multi: false,
-      method: 'load' as LoadMethod,
-      ...options
-    }
-
-    const serviceWithMethod = service as unknown as ServiceWithMethods
-
-    if (['get', '_get', 'find', '_find'].includes(execOptions.method)) {
-      const cacheKey = this.stringifyKey(execOptions, cacheParamsFn)
-
-      const cachedResult = await this.cacheMap.get(cacheKey)
-
-      if (cachedResult) {
-        return cachedResult
-      }
-
-      const methodFn = serviceWithMethod[execOptions.method] as ServiceMethod
-      const result = ['get', '_get'].includes(execOptions.method)
-        ? await methodFn.call(service, execOptions.id, execOptions.params)
-        : await methodFn.call(service, execOptions.params)
-
-      await this.cacheMap.set(cacheKey, result)
-
-      return result
-    }
-
-    const sortedId = Array.isArray(execOptions.id) ? [...execOptions.id].sort() : execOptions.id
-
-    const cacheKey = this.stringifyKey(
+    const execOptions = _.assign(
       {
-        ...execOptions,
-        id: sortedId
+        id: null as unknown,
+        key: this.options.key,
+        params: {},
+        multi: false,
+        method: 'load' as LoadMethod
       },
-      cacheParamsFn
+      _.omit(opts, ['cacheParamsFn'])
     )
 
-    const cachedResult = await this.cacheMap.get(cacheKey)
-
-    if (cachedResult) {
-      return cachedResult
+    if (execOptions.params.query && _.has(execOptions.params.query, filters)) {
+      throw new GeneralError(`Loader load methods cannot contain ${filters.join(', ')} in the query`)
     }
 
-    const loaderKey = this.stringifyKey(
-      {
-        key: execOptions.key,
-        multi: execOptions.multi,
-        method: execOptions.method,
-        params: execOptions.params
-      },
-      cacheParamsFn
-    )
+    const cacheKey = stringifyKey(execOptions, cacheParamsFn)
 
-    const dataLoader =
-      this.loaders.get(loaderKey) ||
-      createDataLoader({
-        key: execOptions.key,
-        multi: execOptions.multi,
-        method: execOptions.method,
-        params: execOptions.params,
+    const cachedPromise = cacheMap.get(cacheKey)
+
+    if (cachedPromise) {
+      return cachedPromise
+    }
+
+    const loaderConfig = _.pick(execOptions, ['key', 'multi', 'method', 'params'])
+
+    const loaderKey = stringifyKey(loaderConfig, cacheParamsFn)
+
+    let dataLoader = loaders.get(loaderKey)
+
+    if (!dataLoader) {
+      dataLoader = createDataLoader({
         service,
-        loaderOptions
+        loaderOptions,
+        ...loaderConfig
       })
 
-    this.loaders.set(loaderKey, dataLoader)
-
-    const result = Array.isArray(sortedId)
-      ? await dataLoader.loadMany(sortedId)
-      : await dataLoader.load(sortedId)
-
-    await this.cacheMap.set(cacheKey, result)
-
-    return result
-  }
-
-  get(id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn): Promise<unknown> {
-    return this.exec({ method: 'get', id, params, cacheParamsFn })
-  }
-
-  _get(id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn): Promise<unknown> {
-    return this.exec({ method: '_get', id, params, cacheParamsFn })
-  }
-
-  find(params?: Params, cacheParamsFn?: CacheParamsFn): Promise<unknown> {
-    return this.exec({ method: 'find', params, cacheParamsFn })
-  }
-
-  _find(params?: Params, cacheParamsFn?: CacheParamsFn): Promise<unknown> {
-    return this.exec({ method: '_find', params, cacheParamsFn })
-  }
-
-  load(id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn): Promise<unknown> {
-    return this.exec({ method: 'load', id, params, cacheParamsFn })
-  }
-
-  _load(id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn): Promise<unknown> {
-    return this.exec({ method: '_load', id, params, cacheParamsFn })
-  }
-
-  key(key: string): KeyLoadMethods {
-    return {
-      load: (id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn) => {
-        return this.exec({
-          method: 'load',
-          id,
-          key,
-          params,
-          cacheParamsFn
-        })
-      },
-      _load: (id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn) => {
-        return this.exec({
-          method: '_load',
-          id,
-          key,
-          params,
-          cacheParamsFn
-        })
-      }
+      loaders.set(loaderKey, dataLoader)
     }
+
+    const promise = Array.isArray(execOptions.id)
+      ? dataLoader.loadMany(execOptions.id)
+      : dataLoader.load(execOptions.id)
+
+    cacheMap.set(cacheKey, promise)
+
+    return promise
   }
 
-  multi(key: string): KeyLoadMethods {
-    return {
-      load: (id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn) => {
-        return this.exec({
-          method: 'load',
-          id,
-          key,
-          params,
-          cacheParamsFn,
-          multi: true
-        })
-      },
-      _load: (id: unknown, params?: Params, cacheParamsFn?: CacheParamsFn) => {
-        return this.exec({
-          method: '_load',
-          id,
-          key,
-          params,
-          cacheParamsFn,
-          multi: true
-        })
-      }
-    }
+  load(id: unknown, params?: Params): Promise<unknown> {
+    return this.exec({ ...this.state, method: 'load', id, params })
   }
 
-  stringifyKey(options: ExecOptions, cacheParamsFn: CacheParamsFn = this.options.cacheParamsFn): string {
-    return stableStringify({
-      ...options,
-      serviceName: this.options.serviceName,
-      params: cacheParamsFn(options.params)
-    })
+  _load(id: unknown, params?: Params): Promise<unknown> {
+    return this.exec({ ...this.state, method: '_load', id, params })
   }
 
-  async clear(): Promise<this> {
-    const { serviceName } = this.options
-    this.loaders.clear()
-    const promises: Promise<unknown>[] = []
-    for await (const cacheKey of this.cacheMap.keys()) {
-      const parsedKey = JSON.parse(cacheKey as string) as { serviceName?: string }
-      if (parsedKey.serviceName === serviceName) {
-        promises.push(Promise.resolve(this.cacheMap.delete(cacheKey)))
-      }
-    }
-    await Promise.all(promises)
+  key(key: string): this {
+    const Loader = this.constructor as typeof ServiceLoader
+    return new Loader(this, { ...this.state, key }) as this
+  }
+
+  multi(): this {
+    const Loader = this.constructor as typeof ServiceLoader
+    return new Loader(this, { ...this.state, multi: true }) as this
+  }
+
+  clear(): this {
+    const { loaders, cacheMap } = this.options
+    loaders.clear()
+    cacheMap.clear()
     return this
   }
 }

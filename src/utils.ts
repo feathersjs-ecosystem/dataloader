@@ -9,26 +9,48 @@ export interface Params {
   /** Authenticated user */
   user?: unknown
   /** Query parameters */
-  query?: Record<string, unknown>
+  query?: Record<string, unknown> | null
   [key: string]: unknown
 }
-
-/** Cache-relevant subset of Params */
-export interface CacheParams {
-  provider?: string
-  authentication?: unknown
-  user?: unknown
-  query?: Record<string, unknown>
-}
-
-/** Function to extract cache-relevant params from full params */
-export type CacheParamsFn = (params: Params | undefined) => CacheParams | undefined
 
 const isObject = (obj: unknown): obj is Record<string, unknown> => {
   if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
     return false
   }
   return Object.getPrototypeOf(obj) === Object.prototype
+}
+
+export const _ = {
+  isObject,
+  assign: <T extends object, U extends object>(target: T, source: U): T & U => {
+    const result = { ...target } as Record<string, unknown>
+    const values = source as Record<string, unknown>
+    for (const key of Object.keys(source)) {
+      if (values[key] !== undefined) {
+        result[key] = values[key]
+      }
+    }
+    return result as T & U
+  },
+  omit: <T extends object, const K extends PropertyKey>(source: T, keys: readonly K[]): Omit<T, K> => {
+    const result = { ...source } as Record<PropertyKey, unknown>
+    for (const key of keys) {
+      delete result[key]
+    }
+    return result as Omit<T, K>
+  },
+  pick: <T extends object, const K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> => {
+    const result = {} as Pick<T, K>
+    for (const key of keys) {
+      if (source[key] !== undefined) {
+        result[key] = source[key]
+      }
+    }
+    return result
+  },
+  has: (source: object, keys: readonly PropertyKey[]): boolean => {
+    return keys.some((key) => Object.prototype.hasOwnProperty.call(source, key))
+  }
 }
 
 /**
@@ -59,7 +81,7 @@ export const stableStringify = (object: unknown): string => {
       )
     }
 
-    if (isObject(value)) {
+    if (_.isObject(value)) {
       const keys = Object.keys(value).sort()
       const result: Record<string, unknown> = {}
       for (let index = 0, length = keys.length; index < length; ++index) {
@@ -74,27 +96,11 @@ export const stableStringify = (object: unknown): string => {
 }
 
 /**
- * Default function to extract cache-relevant params.
- * Includes provider, authentication, user, and query.
- */
-export const defaultCacheParamsFn: CacheParamsFn = (params) => {
-  if (!params) {
-    return params
-  }
-  return {
-    provider: params.provider,
-    authentication: params.authentication,
-    user: params.user,
-    query: params.query
-  }
-}
-
-/**
  * Default function to convert IDs to cache key strings.
  */
-export const defaultCacheKeyFn = (id: unknown): string | undefined => {
+export const defaultCacheKeyFn = (id: unknown): unknown => {
   if (!id) {
-    return undefined
+    return id
   }
   const idWithToString = id as { toString?: () => string }
   return idWithToString.toString ? idWithToString.toString() : String(id)

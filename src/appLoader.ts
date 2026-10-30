@@ -1,91 +1,41 @@
-import { ServiceLoader, ServiceLoaderOptions, CacheMap } from './serviceLoader.js'
-import type { Application } from '@feathersjs/feathers'
-import type { CacheParamsFn } from './utils.js'
+import { ServiceLoader } from './serviceLoader.js'
+import type { ServiceLoaderOptions } from './serviceLoader.js'
 
-type ServiceLoaderConstructor = new (options: ServiceLoaderOptions) => ServiceLoader
+export type ServiceConfig = Omit<ServiceLoaderOptions, 'app' | 'serviceName'>
 
-/** Per-service configuration options */
-export interface ServiceConfig {
-  /** Custom ServiceLoader class to use for this service */
-  ServiceLoader?: ServiceLoaderConstructor
-  /** Custom function to extract cache-relevant params */
-  cacheParamsFn?: CacheParamsFn
-  /** Custom cache storage implementation */
-  cacheMap?: CacheMap
-  [key: string]: unknown
-}
-
-/** Options for configuring an AppLoader instance */
-export interface AppLoaderOptions {
-  /** The Feathers application instance */
-  app: Application
-  /** Per-service configuration overrides */
+export interface AppLoaderOptions extends ServiceConfig {
+  app: ServiceLoaderOptions['app']
   services?: Record<string, ServiceConfig>
-  /** Default ServiceLoader class to use */
-  ServiceLoader?: ServiceLoaderConstructor
-  /** Default function to extract cache-relevant params */
-  cacheParamsFn?: CacheParamsFn
-  /** Default cache storage implementation */
-  cacheMap?: CacheMap
-  [key: string]: unknown
 }
 
-/**
- * Application-level loader that manages ServiceLoader instances.
- * Creates and caches loaders for each service on demand.
- */
+/** Creates service loaders lazily and shares each one throughout a request. */
 export class AppLoader {
   options: {
-    app: Application
+    app: ServiceLoaderOptions['app']
     services: Record<string, ServiceConfig>
-    loaderOptions: Omit<AppLoaderOptions, 'app' | 'services'>
+    loaderOptions: ServiceConfig
+    loaders: Map<string, ServiceLoader>
   }
-  loaders: Map<string, ServiceLoader>
 
   constructor({ app, services = {}, ...loaderOptions }: AppLoaderOptions) {
-    this.options = { app, services, loaderOptions }
-    this.loaders = new Map()
+    this.options = { app, services, loaderOptions, loaders: new Map() }
   }
 
-  /**
-   * Get or create a ServiceLoader for the specified service.
-   * @param serviceName - Name of the Feathers service
-   * @returns ServiceLoader instance for the service
-   */
   service(serviceName: string): ServiceLoader {
-    const { app } = this.options
-    const { ServiceLoader: CustomServiceLoader, ...loaderOptions } = {
-      ServiceLoader: ServiceLoader,
-      ...this.options.loaderOptions,
-      ...(this.options.services[serviceName] || {})
-    }
-    const cachedLoader = this.loaders.get(serviceName)
-
+    const { app, services, loaderOptions, loaders } = this.options
+    const cachedLoader = loaders.get(serviceName)
     if (cachedLoader) {
       return cachedLoader
     }
-
-    const loader = new CustomServiceLoader({
-      ...loaderOptions,
-      serviceName,
-      app
-    })
-
-    this.loaders.set(serviceName, loader)
-
+    const loader = new ServiceLoader({ ...loaderOptions, ...services[serviceName], serviceName, app })
+    loaders.set(serviceName, loader)
     return loader
   }
 
-  /**
-   * Clear all cached loaders and their caches.
-   */
-  async clear(): Promise<this> {
-    const promises: Promise<void>[] = []
-    this.loaders.forEach((loader) => {
-      promises.push(loader.cacheMap.clear() as Promise<void>)
-    })
-    await Promise.all(promises)
-    this.loaders.clear()
+  clear(): this {
+    const { loaders } = this.options
+    loaders.forEach((loader) => loader.clear())
+    loaders.clear()
     return this
   }
 }
