@@ -148,7 +148,7 @@ describe('serviceLoader.test', () => {
       const firstTransaction = new Map()
       const secondTransaction = new Map()
 
-      assert.notStrictEqual(first.options.cacheMap, second.options.cacheMap)
+      assert.notStrictEqual(first.options.loaders, second.options.loaders)
       await first.load(1, { transaction: firstTransaction })
       await second.load(1, { transaction: secondTransaction })
 
@@ -157,21 +157,22 @@ describe('serviceLoader.test', () => {
       assert.strictEqual(calls[1]!.transaction, secondTransaction)
 
       first.clear()
-      assert.equal(first.options.cacheMap.size, 0)
-      assert.equal(second.options.cacheMap.size, 1)
+      assert.equal(first.options.loaders.size, 0)
+      assert.equal(second.options.loaders.size, 1)
       await second.load(1, { transaction: secondTransaction })
       assert.lengthOf(calls, 2)
     })
 
-    it('ignores the removed cacheMap option for both cache layers', async () => {
+    it('ignores the removed cacheMap option', async () => {
       const cacheMap = new Map()
       // @ts-expect-error The removed JS option must not reach DataLoader.
       const configured = new ServiceLoader({ app: loaderApp, serviceName: 'posts', cacheMap })
 
       await configured.load(1)
+      await configured.load(1)
 
-      assert.notStrictEqual(configured.options.cacheMap, cacheMap)
-      assert.equal(configured.options.cacheMap.size, 1)
+      assert.notProperty(configured.options, 'cacheMap')
+      assert.lengthOf(calls, 1)
       assert.equal(cacheMap.size, 0)
     })
 
@@ -389,7 +390,7 @@ describe('serviceLoader.test', () => {
     }
   })
 
-  it('uses default string sorting and shares cached array results across permutations', async () => {
+  it('uses default string sorting and shares cached records across array permutations', async () => {
     const records = [{ id: 2 }, { id: 10 }, { id: 1 }]
     const queries: Params[] = []
     const find = async (params: Params) => {
@@ -404,7 +405,9 @@ describe('serviceLoader.test', () => {
       [1, 10, 2, 2]
     )
     assert.deepEqual(queries[0]!.query, { id: { $in: [1, 10, 2] } })
-    assert.strictEqual(await loader.load([1, 2, 10, 2]), results)
+    const repeated = (await loader.load([1, 2, 10, 2])) as ResultWithId[]
+    assert.notStrictEqual(repeated, results)
+    repeated.forEach((record, index) => assert.strictEqual(record, results[index]))
     assert.lengthOf(queries, 1)
   })
 
@@ -533,50 +536,54 @@ describe('serviceLoader.test', () => {
 
     assert.strictEqual(postsLoader.clear(), postsLoader)
 
-    assert.equal(postsLoader.options.cacheMap.size, 0)
-    assert.equal(commentsLoader.options.cacheMap.size, 1)
+    assert.equal(commentsLoader.options.loaders.size, 1)
     assert.deepEqual(postsLoader.options.loaders.size, 0)
   })
 
-  describe('in-memory promise cache', () => {
-    it('stores and reuses a pending promise synchronously', async () => {
+  describe('DataLoader caching', () => {
+    it('reuses a pending request for identical lookups', async () => {
       let resolveResult!: (value: ResultWithId[]) => void
+      let markStarted!: () => void
       let calls = 0
+      const started = new Promise<void>((resolve) => {
+        markStarted = resolve
+      })
       const result = new Promise<ResultWithId[]>((resolve) => {
         resolveResult = resolve
       })
       const service = {
         find() {
           calls++
+          markStarted()
           return result
         }
       }
       const loader = new ServiceLoader({ app: mockApp(service), serviceName: 'posts' })
       const first = loader.load(1)
-      const cacheMap = loader.options.cacheMap
-      assert.equal(cacheMap.size, 1)
-      const [cachedPromise] = cacheMap.values()
-      assert.instanceOf(cachedPromise, Promise)
+      await started
 
       const second = loader.load(1)
-      assert.equal(cacheMap.size, 1)
-      assert.strictEqual(cacheMap.values().next().value, cachedPromise)
       resolveResult([{ id: 1 }])
 
       assert.deepEqual(await Promise.all([first, second]), [{ id: 1 }, { id: 1 }])
       assert.equal(calls, 1)
     })
 
-    it('reuses the cached promise even when it resolves to null', async () => {
+    it('caches missing results', async () => {
+      let calls = 0
       const loader = new ServiceLoader({
-        app: mockApp({ find: async () => [] }),
+        app: mockApp({
+          find: async () => {
+            calls++
+            return []
+          }
+        }),
         serviceName: 'posts'
       })
 
       assert.isNull(await loader.load(1))
-      const [cachedPromise] = loader.options.cacheMap.values()
       assert.isNull(await loader.load(1))
-      assert.strictEqual(loader.options.cacheMap.values().next().value, cachedPromise)
+      assert.equal(calls, 1)
     })
 
     it.each(['load', '_load'] as const)('allows retrying a failed %s request', async (method) => {
@@ -597,7 +604,6 @@ describe('serviceLoader.test', () => {
         { status: 'rejected', reason: failure }
       ])
       assert.equal(calls, 1)
-      assert.equal(loader.options.cacheMap.size, 0)
 
       const fresh = await loader[method](1)
       assert.deepEqual(fresh, { id: 1 })
@@ -629,19 +635,24 @@ describe('serviceLoader.test', () => {
         const first = (await loader[method]([2, 1])) as unknown[]
         assert.deepEqual(first, [{ id: 1 }, failure])
         assert.strictEqual(first[1], failure)
-        assert.equal(loader.options.cacheMap.size, 0)
 
         const fresh = (await loader[method]([1, 2])) as unknown[]
         assert.deepEqual(fresh, [{ id: 1 }, { id: 2 }])
         assert.strictEqual(fresh[0], first[0])
-        assert.strictEqual(await loader[method]([2, 1]), fresh)
+        const repeated = (await loader[method]([2, 1])) as unknown[]
+        repeated.forEach((record, index) => assert.strictEqual(record, fresh[index]))
         assert.deepEqual(calls, [[1], [2], [2]])
       }
     )
 
-    it.each([{ id: 1 }, { id: [1] }])(
-      'keeps newer cached results when an old request for $id fails after clear()',
-      async ({ id }) => {
+    it.each([
+      { id: 1, targeted: false },
+      { id: [1], targeted: false },
+      { id: 1, targeted: true },
+      { id: [1], targeted: true }
+    ])(
+      'allows fresh loads after an old request for $id fails following clear (targeted: $targeted)',
+      async ({ id, targeted }) => {
         const failure = new Error('Old request failed')
         let rejectOld!: (error: Error) => void
         let markStarted!: () => void
@@ -663,9 +674,8 @@ describe('serviceLoader.test', () => {
         const old = loader.load(id).catch((error: unknown) => error)
         await started
 
-        loader.clear()
+        loader.clear(targeted ? id : undefined)
         const fresh = await loader.load(id)
-        const [freshPromise] = loader.options.cacheMap.values()
 
         rejectOld(failure)
         const oldResult = await old
@@ -674,46 +684,68 @@ describe('serviceLoader.test', () => {
         } else {
           assert.strictEqual(oldResult, failure)
         }
-        assert.equal(loader.options.cacheMap.size, 1)
-        assert.strictEqual(loader.options.cacheMap.values().next().value, freshPromise)
-        assert.strictEqual(await loader.load(id), fresh)
-        assert.equal(calls, 2)
+        assert.deepEqual(await loader.load(id), fresh)
+        // A failed batch clears its keys, including a newer entry for the same key.
+        assert.equal(calls, targeted ? 3 : 2)
       }
     )
 
-    it('clears a pending request without waiting for or cancelling it', async () => {
-      let resolveOld!: (value: ResultWithId[]) => void
-      let markStarted!: () => void
-      let calls = 0
-      const started = new Promise<void>((resolve) => {
-        markStarted = resolve
-      })
-      const service = {
-        find() {
-          calls++
-          if (calls === 1) {
-            markStarted()
-            return new Promise<ResultWithId[]>((resolve) => {
-              resolveOld = resolve
-            })
-          }
-          return Promise.resolve([{ id: 1, body: 'fresh' }])
-        }
+    it.each([0, ''])('clears the falsy value %j without clearing other values', async (value) => {
+      let revision = 0
+      const calls: unknown[][] = []
+      const find = async (params: BatchParams) => {
+        const values = params.query.id!.$in
+        calls.push(values)
+        return values.map((id) => ({ id, revision }))
       }
-      const loader = new ServiceLoader({ app: mockApp(service), serviceName: 'posts' })
-      const pending = loader.load(1)
-      await started
+      const loader = new ServiceLoader({ app: mockApp({ find }), serviceName: 'records' })
+      await loader.load([value, 2])
+      revision++
 
-      assert.strictEqual(loader.clear(), loader)
-      assert.equal(loader.options.cacheMap.size, 0)
-      assert.equal(loader.options.loaders.size, 0)
-      assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
-
-      resolveOld([{ id: 1, body: 'old' }])
-      assert.deepEqual(await pending, { id: 1, body: 'old' })
-      assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
-      assert.equal(calls, 2)
+      loader.clear(value)
+      const results = (await loader.load([value, 2])) as { id: unknown; revision: number }[]
+      assert.deepEqual(results, [
+        { id: value, revision: 1 },
+        { id: 2, revision: 0 }
+      ])
+      assert.deepEqual(calls, [[value, 2], [value]])
     })
+
+    it.each([false, true])(
+      'clears a pending request without cancelling it (targeted: %s)',
+      async (targeted) => {
+        let resolveOld!: (value: ResultWithId[]) => void
+        let markStarted!: () => void
+        let calls = 0
+        const started = new Promise<void>((resolve) => {
+          markStarted = resolve
+        })
+        const service = {
+          find() {
+            calls++
+            if (calls === 1) {
+              markStarted()
+              return new Promise<ResultWithId[]>((resolve) => {
+                resolveOld = resolve
+              })
+            }
+            return Promise.resolve([{ id: 1, body: 'fresh' }])
+          }
+        }
+        const loader = new ServiceLoader({ app: mockApp(service), serviceName: 'posts' })
+        const pending = loader.load(1)
+        await started
+
+        assert.strictEqual(loader.clear(targeted ? 1 : undefined), loader)
+        assert.equal(loader.options.loaders.size, targeted ? 1 : 0)
+        assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
+
+        resolveOld([{ id: 1, body: 'old' }])
+        assert.deepEqual(await pending, { id: 1, body: 'old' })
+        assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
+        assert.equal(calls, 2)
+      }
+    )
   })
 
   describe('chained loaders', () => {
@@ -769,7 +801,8 @@ describe('serviceLoader.test', () => {
 
       const groups = await loader.key('group').multi()._load(['b', 'a'])
       assert.deepEqual(groups, [records.slice(0, 2), [records[2]]])
-      assert.strictEqual(await loader.multi().key('group')._load(['a', 'b']), groups)
+      const repeated = (await loader.multi().key('group')._load(['a', 'b'])) as unknown[]
+      repeated.forEach((group, index) => assert.strictEqual(group, (groups as unknown[])[index]))
       assert.deepEqual(
         calls.map((params) => params.query),
         [{ label: { $in: ['first'] } }, { group: { $in: ['a', 'b'] } }]
@@ -840,7 +873,6 @@ describe('serviceLoader.test', () => {
 
         assert.strictEqual(clearer.clear(), clearer)
         assert.equal(loader.options.loaders.size, 0)
-        assert.equal(loader.options.cacheMap.size, 0)
 
         const after = await readAll()
         assert.equal(after[0].body, body)
@@ -848,6 +880,114 @@ describe('serviceLoader.test', () => {
         assert.equal(after[2][0]!.body, body)
         assert.equal(after[3][0]!.body, body)
       }
+    })
+
+    it.each(['load', '_load'] as const)(
+      'clears one value from single and overlapping array results for %s',
+      async (method) => {
+        const before = (await loader[method]([3, 1, 2])) as TestRecord[]
+        await loader[method]([2, 1])
+        await loader[method](1)
+        records[0]!.body = 'updated'
+
+        assert.strictEqual(loader.clear('1'), loader)
+        assert.strictEqual(await loader[method](2), before[1])
+        const after = (await loader[method]([3, 1, 2])) as TestRecord[]
+        assert.equal(after[0]!.body, 'updated')
+        assert.strictEqual(after[1], before[1])
+        assert.strictEqual(after[2], before[2])
+        assert.deepEqual(await loader[method]([2, 1]), after.slice(0, 2))
+        assert.strictEqual(await loader[method](1), after[0])
+        assert.deepEqual(
+          calls.map((params) => params.query.id!.$in),
+          [[1, 2, 3], [1]]
+        )
+      }
+    )
+
+    it('clears an array of values while retaining other cached records', async () => {
+      const before = (await loader.load([1, 2, 3])) as TestRecord[]
+      records[0]!.body = 'updated first'
+      records[2]!.body = 'updated third'
+      const values = Object.freeze([3, 1, 3])
+
+      assert.strictEqual(loader.clear(values), loader)
+      const after = (await loader.load([1, 2, 3])) as TestRecord[]
+      assert.equal(after[0]!.body, 'updated first')
+      assert.strictEqual(after[1], before[1])
+      assert.equal(after[2]!.body, 'updated third')
+      assert.deepEqual(values, [3, 1, 3])
+      assert.deepEqual(
+        calls.map((params) => params.query.id!.$in),
+        [
+          [1, 2, 3],
+          [1, 3]
+        ]
+      )
+    })
+
+    it('clears string values using the configured key', async () => {
+      records[0]!.label = 'na@example.com'
+      const configured = new ServiceLoader({ app: loaderApp, serviceName: 'records', key: 'label' })
+      await configured.load('na@example.com')
+      records[0]!.body = 'updated'
+
+      assert.strictEqual(configured.clear('na@example.com'), configured)
+      assert.equal(((await configured.load('na@example.com')) as TestRecord).body, 'updated')
+      assert.lengthOf(calls, 2)
+    })
+
+    it('clears matching values across params, modes, and methods', async () => {
+      const variants = [
+        { handle: loader, method: 'load', params: { scope: 'first' } },
+        { handle: loader, method: '_load', params: { scope: 'second' } },
+        { handle: loader.multi(), method: 'load', params: { scope: 'second' } },
+        { handle: loader.multi(), method: '_load', params: { scope: 'first' } }
+      ] as const
+      const readAll = () =>
+        Promise.all(variants.map(({ handle, method, params }) => handle[method]([1, 2], params)))
+      const before = (await readAll()) as (TestRecord | TestRecord[])[][]
+      records[0]!.body = 'updated'
+
+      loader.multi().clear(1)
+      const after = (await readAll()) as (TestRecord | TestRecord[])[][]
+      after.forEach((results, index) => {
+        const first = results[0]!
+        assert.equal((Array.isArray(first) ? first[0]! : first).body, 'updated')
+        assert.strictEqual(results[1], before[index]![1])
+      })
+      assert.lengthOf(calls, 8)
+      calls.slice(4).forEach((params) => assert.deepEqual(params.query.id!.$in, [1]))
+    })
+
+    it('targets the current key without invalidating another key with the same value', async () => {
+      records[0]!.label = '1'
+      const byLabel = loader.key('label')
+      const before = await loader.load(1)
+      await byLabel.load('1')
+      records[0]!.body = 'updated'
+
+      byLabel.clear('1')
+      assert.equal(((await byLabel.load('1')) as TestRecord).body, 'updated')
+      assert.strictEqual(await loader.load(1), before)
+      assert.lengthOf(calls, 3)
+    })
+
+    it('clears cached missing results', async () => {
+      assert.isNull(await loader.load(4))
+      records.push({ id: 4, label: 'fourth', group: 'b', body: 'new' })
+
+      loader.clear(4)
+      assert.deepEqual(await loader.load(4), records[3])
+      assert.lengthOf(calls, 2)
+    })
+
+    it('leaves caches unchanged when clearing an empty array', async () => {
+      const before = await loader.load([1, 2])
+      assert.strictEqual(loader.clear([]), loader)
+      const repeated = (await loader.load([1, 2])) as unknown[]
+      repeated.forEach((record, index) => assert.strictEqual(record, (before as unknown[])[index]))
+      assert.lengthOf(calls, 1)
     })
 
     it('clears retained derived handles through AppLoader.clear()', async () => {

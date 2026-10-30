@@ -53,6 +53,8 @@ The instance `stringifyKey()` helper and the `defaultCacheParamsFn`, `CacheParam
 `clear()` is synchronous and returns its instance. Existing `await clear()` calls still work.
 
 ```js
+loader.service('users').clear(1) // One value
+loader.service('users').clear([1, 2, 3]) // Several values
 loader.service('users').clear() // One service
 loader.clear() // Every service
 ```

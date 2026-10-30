@@ -47,8 +47,7 @@ interface SharedLoaderOptions {
   key: string
   cacheParamsFn: InternalCacheParamsFn
   maxBatchSize?: number
-  loaders: Map<string, DataLoader<unknown, unknown>>
-  cacheMap: Map<string, Promise<unknown>>
+  loaders: Map<string, { key: string; dataLoader: DataLoader<unknown, unknown> }>
 }
 
 interface CreateDataLoaderOptions {
@@ -248,13 +247,12 @@ export class ServiceLoader {
       key: key ?? (service.options?.id || 'id'),
       cacheParamsFn: createDefaultCacheParamsFn(),
       maxBatchSize,
-      loaders: new Map(),
-      cacheMap: new Map()
+      loaders: new Map()
     }
   }
 
   private async exec(opts: ExecOptions = {}): Promise<unknown> {
-    const { service, maxBatchSize, cacheParamsFn, cacheMap, loaders } = this.options
+    const { service, maxBatchSize, cacheParamsFn, loaders } = this.options
 
     const execOptions = _.assign(
       {
@@ -275,56 +273,29 @@ export class ServiceLoader {
       execOptions.value = [...execOptions.value].sort()
     }
 
-    const cacheKey = stringifyKey(execOptions, cacheParamsFn)
-
-    const cachedPromise = cacheMap.get(cacheKey)
-
-    if (cachedPromise) {
-      return cachedPromise
-    }
-
     const loaderConfig = _.pick(execOptions, ['key', 'multi', 'method', 'params'])
 
     const loaderKey = stringifyKey(loaderConfig, cacheParamsFn)
 
-    let dataLoader = loaders.get(loaderKey)
+    let cachedLoader = loaders.get(loaderKey)
 
-    if (!dataLoader) {
-      dataLoader = createDataLoader({
-        service,
-        maxBatchSize,
-        ...loaderConfig
-      })
+    if (!cachedLoader) {
+      cachedLoader = {
+        key: execOptions.key,
+        dataLoader: createDataLoader({
+          service,
+          maxBatchSize,
+          ...loaderConfig
+        })
+      }
 
-      loaders.set(loaderKey, dataLoader)
+      loaders.set(loaderKey, cachedLoader)
     }
 
-    const promise = Array.isArray(execOptions.value)
+    const { dataLoader } = cachedLoader
+    return Array.isArray(execOptions.value)
       ? dataLoader.loadMany(execOptions.value)
       : dataLoader.load(execOptions.value)
-
-    cacheMap.set(cacheKey, promise)
-
-    const evict = () => {
-      if (cacheMap.get(cacheKey) === promise) {
-        cacheMap.delete(cacheKey)
-      }
-    }
-
-    try {
-      const result = await promise
-      if (
-        Array.isArray(execOptions.value) &&
-        Array.isArray(result) &&
-        result.some((item) => item instanceof Error)
-      ) {
-        evict()
-      }
-      return result
-    } catch (error) {
-      evict()
-      throw error
-    }
   }
 
   load(value: unknown, params?: Params): Promise<unknown> {
@@ -345,10 +316,22 @@ export class ServiceLoader {
     return new Loader(this, { ...this.state, multi: true }) as this
   }
 
-  clear(): this {
-    const { loaders, cacheMap } = this.options
-    loaders.clear()
-    cacheMap.clear()
+  clear(value?: unknown): this {
+    const { loaders } = this.options
+    if (value === undefined) {
+      loaders.clear()
+    } else {
+      const values = Array.isArray(value) ? value : [value]
+      if (values.length === 0) {
+        return this
+      }
+      const key = this.state.key ?? this.options.key
+      for (const cachedLoader of loaders.values()) {
+        if (cachedLoader.key === key) {
+          values.forEach((value) => cachedLoader.dataLoader.clear(value))
+        }
+      }
+    }
     return this
   }
 }

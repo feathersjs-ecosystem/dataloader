@@ -16,12 +16,13 @@
 
 ### Fixes and improvements
 
+- Add `ServiceLoader.clear(value)` and `clear(values)` to clear selected lookup values while retaining other cached records.
 - Add a default `key` setting globally, per service, or on direct ServiceLoader construction, falling back to the service's ID field.
 - Resolve matching TypeScript declarations for ESM and CommonJS consumers.
 - Declare Feathers v5 as a peer dependency so consumers can resolve the public types.
 - Keep derived `key()` and `multi()` handles independent while sharing service cache state.
-- Cache promises and missing results consistently using private in-memory maps.
-- Evict failed loads and arrays containing errors so callers can retry while reusing successful results.
+- Remove the separate service result cache and use DataLoader's per-value caching for pending requests, records, and missing results.
+- Allow retrying failed loads while reusing successful results.
 - Preserve nested callbacks, transactions, dates, circular references, and special primitive values when calculating cache identity without mutating service params.
 
 ---
