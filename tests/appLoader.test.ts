@@ -100,26 +100,39 @@ describe('appLoader.test', () => {
     assert.deepEqual(postsLoader.options.cacheMap.size, 1)
     assert.deepEqual(commentsLoader.options.cacheMap.size, 1)
     assert.strictEqual(appLoader.clear(), appLoader)
-    assert.deepEqual(appLoader.options.loaders.size, 0)
+    assert.deepEqual(appLoader.options.loaders.size, 2)
     assert.deepEqual(postsLoader.options.cacheMap.size, 0)
     assert.deepEqual(commentsLoader.options.cacheMap.size, 0)
+    assert.equal(postsLoader.options.loaders.size, 0)
+    assert.equal(commentsLoader.options.loaders.size, 0)
+    assert.strictEqual(appLoader.service('posts'), postsLoader)
+    assert.strictEqual(appLoader.service('comments'), commentsLoader)
   })
 
-  it('clears each service loader before removing it from the map', () => {
-    const cleared: string[] = []
-    const appLoader = new AppLoader({ app })
-    for (const path of ['posts', 'comments']) {
-      const loader = appLoader.service(path)
-      const clear = loader.clear.bind(loader)
-      loader.clear = () => {
-        assert.equal(appLoader.options.loaders.size, 2)
-        cleared.push(path)
-        return clear()
+  it('repeatedly clears caches repopulated through retained and derived handles', async () => {
+    const appLoader = new AppLoader({ app: makeApp() })
+    const postsLoader = appLoader.service('posts')
+    const commentsLoader = appLoader.service('comments')
+    const commentsByPost = commentsLoader.key('postId').multi()
+    let calls = 0
+    const params = {
+      callback: async () => {
+        calls++
       }
     }
 
-    assert.strictEqual(appLoader.clear(), appLoader)
-    assert.deepEqual(cleared, ['posts', 'comments'])
-    assert.equal(appLoader.options.loaders.size, 0)
+    for (let round = 1; round <= 3; round++) {
+      const results = await Promise.all([postsLoader.load(1, params), commentsByPost.load(1, params)])
+      assert.isNotNull(results[0])
+      assert.lengthOf(results[1] as unknown[], 3)
+      assert.equal(calls, round * 2)
+
+      await Promise.all([postsLoader.load(1, params), commentsByPost.load(1, params)])
+      assert.equal(calls, round * 2)
+
+      assert.strictEqual(appLoader.clear(), appLoader)
+      assert.strictEqual(appLoader.service('posts'), postsLoader)
+      assert.strictEqual(appLoader.service('comments'), commentsLoader)
+    }
   })
 })

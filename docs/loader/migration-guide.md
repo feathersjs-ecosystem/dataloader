@@ -1,40 +1,70 @@
-<!--
-This was formerly in the Dove migration guide
- -->
+---
+outline: deep
+---
 
-### Populating With Resolvers
+# Migrating to V1
 
-Resolvers provide a basic way of pulling in data from other services onto results from the current service. They work especially well for populating data onto the results of `get` requests and even on nested `get` requests (multiple levels deep). For anything more complex than `get` requests, you can now use Data Loaders in your resolvers.
+These changes describe the upcoming V1 API compared with 0.2.x.
 
-Read more about populating with data loaders, [here](#populating-with-loaders).
+## Service methods
 
-## Data Loaders
+Service loaders no longer expose `get()`, `_get()`, `find()`, or `_find()`. Use `load()` and `_load()` for relationship lookups, or call the Feathers service directly.
 
-Feathers Dove introduces memorable new APIs for batch-loading and caching. And for the first time, Feathers has a built-in solution for populating data: App Loaders and Service Loaders!
+```js
+const user = await loader.service('users').load(1, params)
+const page = await app.service('users').find({
+  ...params,
+  query: { active: true, $limit: 10 }
+})
+```
 
-You can learn more about Data Loaders, [here](/api/loader/index).
+`load()` runs `find()` hooks and returns `null` for missing records. `_load()` calls `_find()` without hooks.
 
+## multi()
 
-### Service Loaders
+Move the matching field from `multi()` to `key()`:
 
-We mentioned that speed is the goal. The `ServiceLoader` class provides huge speed improvements through intelligent batching of requests. Service Loaders can combine many requests to a service into a single request, saving round-trips to the database.
+```js
+// Before:
+loader.service('comments').multi('postId').load(postId, params)
 
-Thanks to the power of the Feathers Service Interface, these new loaders work with **every** database adapter and almost any custom service. They also cache results with their own built-in cache layer.
+// V1:
+loader.service('comments').key('postId').multi().load(postId, params)
+```
 
-Learn more about Service Loaders, [here](/api/loader/service-loader).
+## Removed configuration
 
-### App Loaders
+Remove `cacheMap` and `cacheParamsFn` overrides, including per-call overrides. Params are now handled automatically, including custom params, callbacks, and transactions.
 
-App Loaders are the most convenient way to lazily instantiate Service Loaders and use them anywhere in your API. Once you've created an app loader, you can call the `service` method to either create or reference a Service Loader by service path name. You can then call `loader.service('users')`, for example, to create or recall a loader for the `users` service. It's a familiar API, being very similar to Feathers' `app.service` method.
+Remove custom loader-class options (`BaseLoader` or `ServiceLoader`) from `AppLoader`. For custom batch functions, use [DataLoader](./loader-utils.md) directly.
 
-Learn more about App Loaders, [here](/api/loader/app-loader). <br>
+The instance `stringifyKey()` helper and the `defaultCacheParamsFn`, `CacheParams`, `CacheParamsFn`, and `CacheMap` exports are removed.
 
-### Populating With Loaders
+## Clearing
 
-When you combine resolvers with data loaders, you get you get the most concise, beautiful API for populating data. It's not even necessary to write schemas to define relationships, first.
+`clear()` is synchronous and returns its instance. Existing `await clear()` calls still work.
 
-Read the "Populating Data" guide, [here](./populating)
+```js
+loader.service('users').clear() // One service
+loader.clear() // Every service
+```
 
-### Community Contributed
+Existing service loaders can continue to be used after clearing.
 
-Many thanks to [@DaddyWarbucks](https://github.com/DaddyWarbucks) for championing this feature.
+## Query filters
+
+`$limit`, `$skip`, and `$sort` cause an error in both load methods. `$limit` is no longer silently removed. Call the service directly when you need these filters.
+
+## Direct construction and TypeScript
+
+Use `app` and `serviceName` when constructing a service loader directly:
+
+```ts
+import { ServiceLoader } from 'feathers-dataloader'
+
+const users = new ServiceLoader({ app, serviceName: 'users' })
+```
+
+Load methods currently return `Promise<unknown>`. Use your application's result types when needed.
+
+See [ServiceLoader](./service-loader.md) for the complete API.

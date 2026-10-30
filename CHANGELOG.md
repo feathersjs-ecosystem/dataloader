@@ -1,5 +1,25 @@
 # Change Log
 
+## Unreleased — V1
+
+### Breaking changes
+
+- Remove service-loader `get`, `_get`, `find`, and `_find` methods. Use `load`/`_load` for relationship lookups or call the Feathers service directly.
+- Make `multi()` take no arguments. Use `.key(field).multi()` to select a relationship field.
+- Remove custom `cacheMap`, `cacheParamsFn`, and AppLoader base-class configuration, and the old cache-params types/default function exports.
+- Normalize all params recursively for cache identity, preserving primitive distinctions and reference identity for callbacks and opaque objects.
+- Reject `$limit`, `$skip`, and `$sort` query filters in both load methods. `$limit` is no longer silently removed.
+- Make cache clearing synchronous. AppLoader retains service loaders when clearing their cached results.
+- Remove the instance `stringifyKey` helper and service-path prefixes from internal cache keys.
+
+### Fixes and improvements
+
+- Keep derived `key()` and `multi()` handles independent while sharing service cache state.
+- Cache promises and missing results consistently using private in-memory maps.
+- Preserve nested callbacks, transactions, dates, circular references, and special primitive values when calculating cache identity without mutating service params.
+
+---
+
 ## [v0.2.1](https://github.com/feathersjs-ecosystem/dataloader/tree/v0.2.1) (2025-01-04)
 
 **Bug Fixes:**

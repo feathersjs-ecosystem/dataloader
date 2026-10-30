@@ -2,63 +2,62 @@
 outline: deep
 ---
 
-# App Loader
+# AppLoader
 
-<BlockQuote type="danger" label="Unpublished">
+`AppLoader` creates and reuses service loaders within a request or unit of work.
 
-This package is not yet available on npm. A pre-release will be available, soon.
-
-</BlockQuote>
-
-<BlockQuote label="Work in Progress">
-
-These docs are incomplete. Feel free to review with the understanding that they will continue to evolve.
-
-</BlockQuote>
-
-## class AppLoader(options)
-
-Create a new app-loader. This is the most commonly-used class.
-
-**Arguments:**
-
-- **options** `{Object}`
-  - **app** `{Object}` - a Feathers app
-  - **services** `{Object}` - An object where each property is a service name and the value is loader options for that service. These options override the `globalLoaderOptions`. Defaults to `{}`
-  - **...globalLoaderOptions** `{Object}` - Any additional options will be assigned to every new `ServiceLoader`.
-
-### AppLoader Example
+## new AppLoader(options)
 
 ```js
-const { AppLoader } = require('@feathersjs/loader')
+import { AppLoader } from 'feathers-dataloader'
 
-const appLoader = new AppLoader({
+const loader = new AppLoader({
   app,
+  maxBatchSize: 100,
   services: {
-    users: { maxBatchSize: 100 }
-  },
-  maxBatchSize: 500
+    users: { maxBatchSize: 50 }
+  }
 })
-
-const loader = appLoader.service('users')
-
-const user = await loader.load(1, params)
-const user = await loader.key('username').load('DaddyWarbucks', params)
-const users = await loader.load([1, 2, 3], params)
-
-const authorUsers = await loader.multi('role').load('author', params)
-const usersByRole = await loader.multi('role').load(['author', 'reader'], params)
-
-const user = await loader.get(1, params)
-const users = await loader.find(params)
-
-await loader.clear()
 ```
 
-### AppLoader Instances
+| Option                    | Required | Description                                                                                                                                                                    |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app`                     | Yes      | A Feathers application with a `service(name)` method.                                                                                                                          |
+| `services`                | No       | Options by service name, overriding the global loader options. Defaults to `{}`.                                                                                               |
+| Additional loader options | No       | Options passed to each service's underlying DataLoaders, such as `maxBatchSize`, `batchScheduleFn`, or `cacheKeyFn`. See [ServiceLoader options](./service-loader.md#options). |
 
-After you have created an `AppLoader` instance, as shown in the [previous example](#apploader-example), each loader instance has single `service` method available.
+## service(serviceName)
 
-**Instance Methods**
+Returns the service's `ServiceLoader`, creating it on first use. Repeated calls with the same service name return the same loader.
 
-- **service** `(servicePath: string) => ServiceLoader` - look up or create a ServiceLoader for the provided `servicePath`.
+```js
+const users = loader.service('users')
+const sameUsers = loader.service('users')
+console.log(users === sameUsers) // true
+
+const user = await users.load(1, params)
+const authors = await users.key('role').multi().load('author', params)
+```
+
+Each service owns separate caches. See [ServiceLoader](./service-loader.md) for loading, chaining, and params behavior.
+
+## clear()
+
+Clears cached results for every service and returns the `AppLoader` synchronously. Existing service loaders can continue to be used.
+
+```js
+loader.clear()
+```
+
+Use `loader.service('users').clear()` to clear just one service.
+
+## TypeScript
+
+`AppLoaderOptions` describes constructor options. `ServiceConfig` describes global and per-service loader options.
+
+```ts
+import { AppLoader, type AppLoaderOptions } from 'feathers-dataloader'
+
+const options: AppLoaderOptions = { app, maxBatchSize: 100 }
+const loader = new AppLoader(options)
+```

@@ -2,257 +2,124 @@
 outline: deep
 ---
 
-# Service Loader
+# ServiceLoader
 
-<BlockQuote type="danger" label="Unpublished">
+A service loader batches relationship lookups. Obtain one through [AppLoader.service()](./app-loader.md#serviceservicename), or construct one directly.
 
-This package is not yet available on npm. A pre-release will be available, soon.
-
-</BlockQuote>
-
-<BlockQuote label="Work in Progress">
-
-These docs are incomplete. Feel free to review with the understanding that they will continue to evolve.
-
-</BlockQuote>
-
-## The ServiceLoader Class
-
-Create a new service-loader. This class lazily configures underlying `DataLoader` and `FindLoader` for a given service
-
-<BlockQuote label="todo">
-
-TODO: Provide Links to the DataLoader and FindLoader options.
-
-</BlockQuote>
-
-**Arguments:**
-
-- **options** `{Object}`
-  - **app** `{Object}` - A Feathers app,
-  - **serviceName** `{String}` - The name of the service
-  - **cacheMap** `{Object}` - Instance of Map (or an object with a similar API) to be used as cache. Defaults to `new Map()`
-  - **cacheParamsFn** `{Function}` - A function that returns JSON.strinify-able params of a query to be used in the `cacheMap`. This function should return a set of params that will be used to identify this unique query and removes any non-serializable items. The default function returns traverses params and removes any functions. Defaults to `defaultCacheParamsFn`
-  - **cacheKeyFn** `{Function}` - Normalize keys. `(key) => key && key.toString ? key.toString() : String(key)` Defaults to `defaultCacheKeyFn`
-
-There are two ways to create `ServiceLoader` instances.
-
-### Create With AppLoader
-
-The most common way to create `ServiceLoader` instances is through the [`AppLoader` class](/api/loader/app-loader). Here's an example:
+## new ServiceLoader(options)
 
 ```js
-const { AppLoader } = require('@feathersjs/loader')
+import { ServiceLoader } from 'feathers-dataloader'
 
-const loader = new AppLoader({ app, maxBatchSize: 500 })
-
-// This is our ServiceLoader instance
-const userLoader = loader.service('users')
-```
-
-### Create Directly
-
-You can also directly create an instance using the `ServiceLoader` class.
-
-```js
-const { ServiceLoader } = require('@feathersjs/loader')
-
-// This is our ServiceLoader instance
-const userLoader = new ServiceLoader({ app, serviceName: 'users' })
-```
-
-## Example
-
-```js
-const { ServiceLoader } = require('@feathersjs/loader')
-
-// See DataLoader options
-const loaderOptions = {}
-
-const loader = new ServiceLoader({
-  app
+const users = new ServiceLoader({
+  app,
   serviceName: 'users',
-  ...loaderOptions
-})
-
-// Any Feathers Params
-const params = {}
-
-const user = await loader.load(1, params)
-const user = await loader.key('username').load('DaddyWarbucks', params)
-const users = await loader.load([1, 2, 3], params)
-
-const authorUsers = await loader.multi('role').load('author', params)
-const usersByRole = await loader.multi('role').load(['author', 'reader'], params)
-
-const user = await loader.get(1, params)
-const users = await loader.find(params)
-
-await loader.clear()
-```
-
-## Instances
-
-Each `ServiceLoader` instance provides the several methods for handling data. There are three sets of methods:
-
-- The [Chainable Loader Methods](#chainable-loader-methods): `load`, `key`, and `multi`.
-- The [Configurable Loader Method](#configurable-loader-method): `exec`.
-- The [Get and Find Methods](#cache-loader-methods): `find`, `get`, and `clear`.
-
-### Chainable Loader Methods
-
-A memorable, shorthand API for performing intelligent data loading through query/relationship batching and caching.
-
-- **load** `(id | id[], params) => Promise<RelatedData>` - loads one relationship for each `id`. The name of the attribute to use as the key will be pulled from the service options, unless changed using the chainable `key()` method, below.
-- **key** `(key: string) => { load }` - Specifies the attribute to use as the key for the relationship. This key represents the attribute name in the service specified when creating the current ServiceLoader.
-- **multi** `(key: string) => { load }` -
-
-### Configurable Loader Method
-
-This method is similar to the chainable methods in that it performs query/relationship batching and caching, but it also allows passing a custom `cacheParamsFn`.
-
-- **exec** `(options: ExecOptions) => Promise<RelatedData>` - runs the data loader with the provided options.
-  - **options** `{ExecOptions}`
-    - **id** `{id | id[]}` - the value of the `idKey` in the relationship to be loaded.
-    - **idKey** `{string}` - the key on the remote service on which to query. Will use the `id` value to retrieve each relationship.
-    - **multi** `{boolean}` - whether to return multiple results for each id/relationship. Defaults to `false`.
-    - **params** `{ServiceParams}` - additional params to provide to the underlying Feathers service.
-    - **cacheParamsFn** `() => ?` **//TODO fill in cacheParamsFn**
-
-### Get and Find Methods
-
-The `find` and `get` methods work similar to `service.find` and `service.get` and also perform result caching. They do not perform query/relationship batching.
-
-- **find** `(params) => Promise<Data>` - makes a request with the underlying service's `find` method and caches the results.
-- **_find** `(params) => Promise<Data>` - makes a request with the underlying service's `_find` method and caches the results.
-- **get** `(id, params) => Promise<Data>` - makes a request with the underlying service's `get` method and caches the results.
-- **_get** `(id, params) => Promise<Data>` - makes a request with the underlying service's `_get` method and caches the results.
-- **clear** `() => self` - clears the internal cache map.
-
-## Loading on a Custom Key
-
-You can change the key of the loaded relationship by using the `multi(keyName)` or `key(keyName)` chainable methods OR by providing the `idKey` option when calling the `exec` method.
-
-<BlockQuote label="database tip">
-
-For faster queries when you query on a different key, make sure your database has an index on the matching key.
-
-</BlockQuote>
-
-```js
-// Use `.key` to change the relationship key
-await app.service('users').key('email').load('one@test.com')
-
-// Use `.multi` to change the relationship key
-await app.service('comments').multi('userId').load(5)
-
-// Same as the previous line, but using `.exec` to change the relationship key
-await app.service('comments').exec({
-  id: 5,
-  multi: true,
-  idKey: 'userId'
+  maxBatchSize: 100
 })
 ```
 
-## Instance Examples
+### Options
 
-After you have created an `ServiceLoader` instance, as shown in the [previous example](#serviceloader-example), the following instance methods are available.
+| Option            | Default             | Description                                                             |
+| ----------------- | ------------------- | ----------------------------------------------------------------------- |
+| `app`             | Required            | A Feathers application.                                                 |
+| `serviceName`     | Required            | Name passed to `app.service()`.                                         |
+| `maxBatchSize`    | `Infinity`          | Maximum number of keys per batch.                                       |
+| `batch`           | `true`              | Whether to batch keys.                                                  |
+| `batchScheduleFn` | DataLoader default  | Controls when a batch runs.                                             |
+| `cache`           | `true`              | Enables DataLoader's memoization; service-loader caching still applies. |
+| `cacheKeyFn`      | `defaultCacheKeyFn` | Converts IDs to DataLoader cache keys.                                  |
+| `name`            | `null`              | Optional DataLoader name.                                               |
 
-Think of a ServiceLoader as a relationship loader. One "relationship" of data is retrieved per provided `id`. A "relationship" will either contain one result or multiple results, depending on the value of `multi`.
+See [DataLoader options](https://github.com/graphql/dataloader#new-dataloaderbatchloadfn--options) for details.
 
-### Load a Single User by `id`
+## load(id, params = {})
 
-This example returns a single user with the `id` of `1`.
+Loads a record using the service's `find()` method with hooks. Compatible calls are batched into a `$in` query.
 
 ```js
-await app.service('users').load(1)
-/*
-{ id: 1, name: '...' }
-*/
+const user = await users.load(1, params)
+const people = await users.load([2, 1, 2, 999], params)
+// [user1, user2, user2, null] when 999 is missing
 ```
 
-### Load a Array of Users by `id`
+The matching key defaults to `service.options.id`, or `'id'`. Array keys use JavaScript's default `.sort()` order (string comparison), with duplicates preserved. The input array is not mutated. A missing match returns `null`.
 
-This example returns an array of users, one for each `id` in the array. The order of the returned users will match the index of their corresponding `email` in the array.
+### Params and queries
+
+Params are passed to the service, with pagination disabled and the matching query field replaced by the batch's `$in` condition. Other query conditions are retained.
+
+`$skip`, `$sort`, and `$limit` cause an error because they would apply to the whole batch. Use a direct service query when you need them. If using `$select`, include the matching field so results can be mapped to keys.
+
+### Errors
+
+A single-key load rejects on failure. Array loads can resolve with `Error` entries at failed positions. Invalid query filters reject the entire call.
 
 ```js
-await app.service('users').load([1, 2, 3])
-/*
-[
-  { id: 1, name: '...' },
-  { id: 2, name: '...' },
-  { id: 3, name: '...' }
-]
-*/
+const results = await users.load([1, 2])
+for (const result of results) {
+  if (result instanceof Error) {
+    // Handle this key's failure.
+  }
+}
 ```
 
-### Load a Single User by `email`
+## \_load(id, params = {})
 
-This example returns a single user with the `email` of `icecream@strausmilk.com`.
+Works like `load()`, but calls `_find()` without service hooks. The service must implement `_find()`.
 
 ```js
-await app.service('users').key('email').load('icecream@strausmilk.com')
-/*
-{ id: 5, email: 'icecream@strausmilk.com' }
-*/
+const user = await users._load(1, params)
 ```
 
-### Load Users by Many `email`s
+## key(field)
 
-This example returns an array of users, one for each `email` in the array. The order of the returned users will match the index of their corresponding `email` in the array. This is kind of like a query using `{ email: { $in: emails } }`, and returns the results in an idempotent order.
+Returns a loader for a different matching field without changing the original loader. Dot notation is supported when the adapter can query the nested field.
 
 ```js
-await app.service('users').key('email').load(['one@test.com', 'two@test.com', 'three@test.com'])
-/*
-[
-  { id: 72, email: 'one@test.com' },
-  { id: 26, email: 'two@test.com' },
-  { id: 23, email: 'three@test.com' }
-]
-*/
+const user = await users.key('email').load('reader@example.com', params)
+const event = await loader.service('events').key('metadata.externalId').load('abc', params)
 ```
 
-### Load Multiple for One `userId`
+## multi()
 
-This example returns an array comments where each comment's `userId` is `1`.
+Returns all matching records per key. Choose the field with `key()`; `multi()` takes no arguments.
 
 ```js
-await app.service('comments').multi('userId').load(1)
-/*
-[
-  { id: 14, userId: 1, text: '...' },
-  { id: 25, userId: 1, text: '...' },
-  { id: 52, userId: 1, text: '...' }
-]
-*/
+const byPost = loader.service('comments').key('postId').multi()
+const comments = await byPost.load(1, params) // Record[] or null
+const groups = await byPost.load([2, 1], params) // Groups for post 1, then post 2
 ```
 
-### Load Multiple for Each `userId`
+`multi().key('postId')` also works. Without `key()`, the service's default ID field is used. Missing groups return `null`.
 
-This example returns an array comments where each comment's `userId` matches each `id` in `[1, 2, 3]`. The returned result is a two-dimensional array, where the order of results matches the order of the provided ids.
+## clear()
+
+Clears cached results for this service, including loaders created with `key()` and `multi()`. Returns the loader synchronously.
 
 ```js
-await app.service('comments').multi('userId').load([1, 2, 3])
-/*
-[
-  // result set for userId of 1
-  [
-    { id: 14, userId: 1, text: '...' },
-    { id: 25, userId: 1, text: '...' },
-    { id: 52, userId: 1, text: '...' }
-  ],
-  // result set for userId of 2
-  [
-    { id: 24, userId: 2, text: '...' },
-    { id: 35, userId: 2, text: '...' },
-    { id: 62, userId: 2, text: '...' }
-  ],
-  // result set for userId of 3
-  [
-    { id: 64, userId: 3, text: '...' },
-    { id: 75, userId: 3, text: '...' },
-    { id: 12, userId: 3, text: '...' }
-  ]
-]
-*/
+users.clear()
+```
+
+## exec(options)
+
+Runs a lookup using explicit options. `load()` and `_load()` use this method internally.
+
+| Option   | Default            | Description                                       |
+| -------- | ------------------ | ------------------------------------------------- |
+| `id`     | `null`             | Key or array of keys to load. Supply a valid key. |
+| `key`    | Service's ID field | Matching field.                                   |
+| `multi`  | `false`            | Return all matching records per key.              |
+| `method` | `'load'`           | `'load'` or `'_load'`.                            |
+| `params` | `{}`               | Service params.                                   |
+
+These defaults apply independently of any `key()` or `multi()` chaining.
+
+## TypeScript
+
+The package exports `ServiceLoaderOptions`, `LoadMethod`, and `Params`. Load methods currently return `Promise<unknown>`; use your application's result types when needed.
+
+```ts
+type User = { id: number; name: string }
+const user = (await users.load(1)) as User | null
 ```

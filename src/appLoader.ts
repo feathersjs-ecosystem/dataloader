@@ -35,7 +35,6 @@ export class AppLoader {
   clear(): this {
     const { loaders } = this.options
     loaders.forEach((loader) => loader.clear())
-    loaders.clear()
     return this
   }
 }

@@ -276,6 +276,10 @@ export class ServiceLoader {
       throw new GeneralError(`Loader load methods cannot contain ${filters.join(', ')} in the query`)
     }
 
+    if (Array.isArray(execOptions.id)) {
+      execOptions.id = [...execOptions.id].sort()
+    }
+
     const cacheKey = stringifyKey(execOptions, cacheParamsFn)
 
     const cachedPromise = cacheMap.get(cacheKey)

@@ -293,15 +293,41 @@ describe('serviceLoader.test', () => {
     assert.deepEqual(result, defaultResult)
   })
 
-  it('preserves requested ID order, duplicate IDs, and empty arrays', async () => {
+  it('sorts array IDs without mutating the input and preserves duplicates and empty arrays', async () => {
     const loader = new ServiceLoader({ app, serviceName: 'posts' })
-    for (const ids of [[3, 1, 2], [2, 1, 2], [1, 2, 3], []]) {
-      const results = (await loader.load(ids)) as ResultWithId[]
-      assert.deepEqual(
-        results.map((record) => record.id),
-        ids
-      )
+    const cases = [
+      { ids: Object.freeze([3, 1, 2]), expected: [1, 2, 3] },
+      { ids: Object.freeze([2, 1, 2]), expected: [1, 2, 2] },
+      { ids: Object.freeze([]), expected: [] }
+    ]
+    for (const method of ['load', '_load'] as const) {
+      for (const { ids, expected } of cases) {
+        const results = (await loader[method](ids)) as ResultWithId[]
+        assert.deepEqual(
+          results.map((record) => record.id),
+          expected
+        )
+      }
     }
+  })
+
+  it('uses default string sorting and shares cached array results across permutations', async () => {
+    const records = [{ id: 2 }, { id: 10 }, { id: 1 }]
+    const queries: Params[] = []
+    const find = async (params: Params) => {
+      queries.push(params)
+      return records
+    }
+    const loader = new ServiceLoader({ app: mockApp({ find }), serviceName: 'records' })
+    const results = (await loader.load([2, 10, 2, 1])) as ResultWithId[]
+
+    assert.deepEqual(
+      results.map((record) => record.id),
+      [1, 10, 2, 2]
+    )
+    assert.deepEqual(queries[0]!.query, { id: { $in: [1, 10, 2] } })
+    assert.strictEqual(await loader.load([1, 2, 10, 2]), results)
+    assert.lengthOf(queries, 1)
   })
 
   it('retains upstream dot notation support in keyed and multi loading', async () => {
@@ -317,10 +343,10 @@ describe('serviceLoader.test', () => {
     }
     const loader = new ServiceLoader({ app: mockApp({ find, _find: find }), serviceName: 'records' })
 
-    assert.deepEqual(await loader.key('nested.code').load(['third', 'first']), [records[2], records[0]])
+    assert.deepEqual(await loader.key('nested.code').load(['third', 'first']), [records[0], records[2]])
     assert.deepEqual(await loader.key('nested.group').multi().load(['b', 'a']), [
-      [records[2]],
-      records.slice(0, 2)
+      records.slice(0, 2),
+      [records[2]]
     ])
     assert.deepEqual(await loader.multi().key('nested.group')._load('a'), records.slice(0, 2))
   })
@@ -570,7 +596,7 @@ describe('serviceLoader.test', () => {
       assert.deepEqual<unknown>(results, records.slice(0, 2))
       assert.lengthOf(calls, 1)
       assert.deepEqual(calls[0]!.query.label!.$in, ['first', 'second'])
-      assert.deepEqual(await loader.key('label').load(['second', 'first']), [records[1], records[0]])
+      assert.deepEqual(await loader.key('label').load(['second', 'first']), [records[0], records[1]])
       assert.lengthOf(calls, 1)
     })
 
