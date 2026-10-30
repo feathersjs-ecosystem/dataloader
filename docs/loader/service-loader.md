@@ -87,15 +87,12 @@ const groups = await byPost.load([2, 1], params) // Groups for post 1, then post
 
 `multi().key('postId')` also works. Without `key()`, the loader's default matching field is used. Missing groups return `null`.
 
-## clear(value?)
+## clear()
 
-Pass a value or array to clear matching lookups for the current key across params, single/multi modes, and both load methods. Other values remain cached. With no argument, clears all cached results for this service. Returns the loader synchronously.
+Clears all cached results for this service, including loaders created with `key()` and `multi()`. Returns the loader synchronously.
 
 ```js
-users.clear(1)
-users.clear([1, 2, 3])
-users.key('email').clear('na@example.com')
-users.clear() // Clear the whole service.
+users.clear()
 ```
 
 ## TypeScript

@@ -674,14 +674,9 @@ describe('serviceLoader.test', () => {
       }
     )
 
-    it.each([
-      { id: 1, targeted: false },
-      { id: [1], targeted: false },
-      { id: 1, targeted: true },
-      { id: [1], targeted: true }
-    ])(
-      'allows fresh loads after an old request for $id fails following clear (targeted: $targeted)',
-      async ({ id, targeted }) => {
+    it.each([{ id: 1 }, { id: [1] }])(
+      'allows fresh loads after an old request for $id fails following clear()',
+      async ({ id }) => {
         const failure = new Error('Old request failed')
         let rejectOld!: (error: Error) => void
         let markStarted!: () => void
@@ -703,7 +698,7 @@ describe('serviceLoader.test', () => {
         const old = loader.load(id).catch((error: unknown) => error)
         await started
 
-        loader.clear(targeted ? id : undefined)
+        loader.clear()
         const fresh = await loader.load(id)
 
         rejectOld(failure)
@@ -714,67 +709,42 @@ describe('serviceLoader.test', () => {
           assert.strictEqual(oldResult, failure)
         }
         assert.deepEqual(await loader.load(id), fresh)
-        // A failed batch clears its keys, including a newer entry for the same key.
-        assert.equal(calls, targeted ? 3 : 2)
-      }
-    )
-
-    it.each([0, ''])('clears the falsy value %j without clearing other values', async (value) => {
-      let revision = 0
-      const calls: unknown[][] = []
-      const find = async (params: BatchParams) => {
-        const values = params.query.id!.$in
-        calls.push(values)
-        return values.map((id) => ({ id, revision }))
-      }
-      const loader = new ServiceLoader({ app: mockApp({ find }), serviceName: 'records' })
-      await loader.load([value, 2])
-      revision++
-
-      loader.clear(value)
-      const results = (await loader.load([value, 2])) as { id: unknown; revision: number }[]
-      assert.deepEqual(results, [
-        { id: value, revision: 1 },
-        { id: 2, revision: 0 }
-      ])
-      assert.deepEqual(calls, [[value, 2], [value]])
-    })
-
-    it.each([false, true])(
-      'clears a pending request without cancelling it (targeted: %s)',
-      async (targeted) => {
-        let resolveOld!: (value: ResultWithId[]) => void
-        let markStarted!: () => void
-        let calls = 0
-        const started = new Promise<void>((resolve) => {
-          markStarted = resolve
-        })
-        const service = {
-          find() {
-            calls++
-            if (calls === 1) {
-              markStarted()
-              return new Promise<ResultWithId[]>((resolve) => {
-                resolveOld = resolve
-              })
-            }
-            return Promise.resolve([{ id: 1, body: 'fresh' }])
-          }
-        }
-        const loader = new ServiceLoader({ app: mockApp(service), serviceName: 'posts' })
-        const pending = loader.load(1)
-        await started
-
-        assert.strictEqual(loader.clear(targeted ? 1 : undefined), loader)
-        assert.equal(loader.options.loaders.size, targeted ? 1 : 0)
-        assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
-
-        resolveOld([{ id: 1, body: 'old' }])
-        assert.deepEqual(await pending, { id: 1, body: 'old' })
-        assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
         assert.equal(calls, 2)
       }
     )
+
+    it('clears a pending request without cancelling it', async () => {
+      let resolveOld!: (value: ResultWithId[]) => void
+      let markStarted!: () => void
+      let calls = 0
+      const started = new Promise<void>((resolve) => {
+        markStarted = resolve
+      })
+      const service = {
+        find() {
+          calls++
+          if (calls === 1) {
+            markStarted()
+            return new Promise<ResultWithId[]>((resolve) => {
+              resolveOld = resolve
+            })
+          }
+          return Promise.resolve([{ id: 1, body: 'fresh' }])
+        }
+      }
+      const loader = new ServiceLoader({ app: mockApp(service), serviceName: 'posts' })
+      const pending = loader.load(1)
+      await started
+
+      assert.strictEqual(loader.clear(), loader)
+      assert.equal(loader.options.loaders.size, 0)
+      assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
+
+      resolveOld([{ id: 1, body: 'old' }])
+      assert.deepEqual(await pending, { id: 1, body: 'old' })
+      assert.deepEqual(await loader.load(1), { id: 1, body: 'fresh' })
+      assert.equal(calls, 2)
+    })
   })
 
   describe('chained loaders', () => {
@@ -905,28 +875,6 @@ describe('serviceLoader.test', () => {
       assert.lengthOf(calls, 2)
     })
 
-    it.each([{ value: 1 }, { value: [1] }, { value: [] }])(
-      'preserves params references when clearing $value',
-      async ({ value }) => {
-        const params = { callback: () => {}, transaction: new Map() }
-        const before = (await loader.load([1, 2], params)) as TestRecord[]
-        const normalizer = loader.options.cacheParamsFn
-        records[0]!.body = 'updated'
-
-        loader.clear(value)
-        assert.strictEqual(loader.options.cacheParamsFn, normalizer)
-        const after = (await loader.load([1, 2], params)) as TestRecord[]
-        assert.strictEqual(after[1], before[1])
-        if (Array.isArray(value) && value.length === 0) {
-          assert.strictEqual(after[0], before[0])
-          assert.lengthOf(calls, 1)
-        } else {
-          assert.equal(after[0]!.body, 'updated')
-          assert.lengthOf(calls, 2)
-        }
-      }
-    )
-
     it('clears every cached variant from base or derived handles after repeated writes', async () => {
       const keyed = loader.key('label')
       const multi = loader.key('group').multi()
@@ -952,112 +900,13 @@ describe('serviceLoader.test', () => {
       }
     })
 
-    it.each(['load', '_load'] as const)(
-      'clears one value from single and overlapping array results for %s',
-      async (method) => {
-        const before = (await loader[method]([3, 1, 2])) as TestRecord[]
-        await loader[method]([2, 1])
-        await loader[method](1)
-        records[0]!.body = 'updated'
-
-        assert.strictEqual(loader.clear('1'), loader)
-        assert.strictEqual(await loader[method](2), before[1])
-        const after = (await loader[method]([3, 1, 2])) as TestRecord[]
-        assert.equal(after[0]!.body, 'updated')
-        assert.strictEqual(after[1], before[1])
-        assert.strictEqual(after[2], before[2])
-        assert.deepEqual(await loader[method]([2, 1]), after.slice(0, 2))
-        assert.strictEqual(await loader[method](1), after[0])
-        assert.deepEqual(
-          calls.map((params) => params.query.id!.$in),
-          [[1, 2, 3], [1]]
-        )
-      }
-    )
-
-    it('clears an array of values while retaining other cached records', async () => {
-      const before = (await loader.load([1, 2, 3])) as TestRecord[]
-      records[0]!.body = 'updated first'
-      records[2]!.body = 'updated third'
-      const values = Object.freeze([3, 1, 3])
-
-      assert.strictEqual(loader.clear(values), loader)
-      const after = (await loader.load([1, 2, 3])) as TestRecord[]
-      assert.equal(after[0]!.body, 'updated first')
-      assert.strictEqual(after[1], before[1])
-      assert.equal(after[2]!.body, 'updated third')
-      assert.deepEqual(values, [3, 1, 3])
-      assert.deepEqual(
-        calls.map((params) => params.query.id!.$in),
-        [
-          [1, 2, 3],
-          [1, 3]
-        ]
-      )
-    })
-
-    it('clears string values using the configured key', async () => {
-      records[0]!.label = 'na@example.com'
-      const configured = new ServiceLoader({ app: loaderApp, serviceName: 'records', key: 'label' })
-      await configured.load('na@example.com')
-      records[0]!.body = 'updated'
-
-      assert.strictEqual(configured.clear('na@example.com'), configured)
-      assert.equal(((await configured.load('na@example.com')) as TestRecord).body, 'updated')
-      assert.lengthOf(calls, 2)
-    })
-
-    it('clears matching values across params, modes, and methods', async () => {
-      const variants = [
-        { handle: loader, method: 'load', params: { scope: 'first' } },
-        { handle: loader, method: '_load', params: { scope: 'second' } },
-        { handle: loader.multi(), method: 'load', params: { scope: 'second' } },
-        { handle: loader.multi(), method: '_load', params: { scope: 'first' } }
-      ] as const
-      const readAll = () =>
-        Promise.all(variants.map(({ handle, method, params }) => handle[method]([1, 2], params)))
-      const before = (await readAll()) as (TestRecord | TestRecord[])[][]
-      records[0]!.body = 'updated'
-
-      loader.multi().clear(1)
-      const after = (await readAll()) as (TestRecord | TestRecord[])[][]
-      after.forEach((results, index) => {
-        const first = results[0]!
-        assert.equal((Array.isArray(first) ? first[0]! : first).body, 'updated')
-        assert.strictEqual(results[1], before[index]![1])
-      })
-      assert.lengthOf(calls, 8)
-      calls.slice(4).forEach((params) => assert.deepEqual(params.query.id!.$in, [1]))
-    })
-
-    it('targets the current key without invalidating another key with the same value', async () => {
-      records[0]!.label = '1'
-      const byLabel = loader.key('label')
-      const before = await loader.load(1)
-      await byLabel.load('1')
-      records[0]!.body = 'updated'
-
-      byLabel.clear('1')
-      assert.equal(((await byLabel.load('1')) as TestRecord).body, 'updated')
-      assert.strictEqual(await loader.load(1), before)
-      assert.lengthOf(calls, 3)
-    })
-
     it('clears cached missing results', async () => {
       assert.isNull(await loader.load(4))
       records.push({ id: 4, label: 'fourth', group: 'b', body: 'new' })
 
-      loader.clear(4)
+      loader.clear()
       assert.deepEqual(await loader.load(4), records[3])
       assert.lengthOf(calls, 2)
-    })
-
-    it('leaves caches unchanged when clearing an empty array', async () => {
-      const before = await loader.load([1, 2])
-      assert.strictEqual(loader.clear([]), loader)
-      const repeated = (await loader.load([1, 2])) as unknown[]
-      repeated.forEach((record, index) => assert.strictEqual(record, (before as unknown[])[index]))
-      assert.lengthOf(calls, 1)
     })
 
     it('clears retained derived handles through AppLoader.clear()', async () => {

@@ -16,7 +16,6 @@
 
 ### Fixes and improvements
 
-- Add `ServiceLoader.clear(value)` and `clear(values)` to clear selected lookup values while retaining other cached records.
 - Add a default `key` setting globally, per service, or on direct ServiceLoader construction, falling back to the service's ID field.
 - Resolve matching TypeScript declarations for ESM and CommonJS consumers.
 - Declare Feathers v5 as a peer dependency so consumers can resolve the public types.

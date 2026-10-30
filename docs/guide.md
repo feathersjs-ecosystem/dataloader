@@ -53,12 +53,12 @@ Clear affected services before loading updated data:
 
 ```js
 await app.service('users').patch(userId, changes, params)
-loader.service('users').clear(userId)
+loader.service('users').clear()
 
 const updatedUser = await loader.service('users').load(userId, params)
 ```
 
-Omit the value to clear the whole service, or use `loader.clear()` to clear every service. Both clear methods are synchronous, and existing loaders can continue to be used.
+Use `loader.clear()` to clear every service. Both clear methods are synchronous, and existing loaders can continue to be used.
 
 Cached records are shared objects. Copy them before making local changes.
 

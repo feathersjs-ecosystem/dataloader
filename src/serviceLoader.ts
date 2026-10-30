@@ -46,7 +46,7 @@ interface SharedLoaderOptions {
   service: LoaderService
   cacheParamsFn: InternalCacheParamsFn
   maxBatchSize?: number
-  loaders: Map<string, { key: string; dataLoader: DataLoader<unknown, unknown> }>
+  loaders: Map<string, DataLoader<unknown, unknown>>
 }
 
 interface CreateDataLoaderOptions {
@@ -271,22 +271,17 @@ export class ServiceLoader {
     const loaderConfig = _.pick(opts, ['key', 'multi', 'method', 'params'])
     const loaderKey = stringifyKey(loaderConfig, cacheParamsFn)
 
-    let cachedLoader = loaders.get(loaderKey)
+    let dataLoader = loaders.get(loaderKey)
 
-    if (!cachedLoader) {
-      cachedLoader = {
-        key: opts.key,
-        dataLoader: createDataLoader({
-          service,
-          maxBatchSize,
-          ...loaderConfig
-        })
-      }
+    if (!dataLoader) {
+      dataLoader = createDataLoader({
+        service,
+        maxBatchSize,
+        ...loaderConfig
+      })
 
-      loaders.set(loaderKey, cachedLoader)
+      loaders.set(loaderKey, dataLoader)
     }
-
-    const { dataLoader } = cachedLoader
 
     return Array.isArray(opts.value) ? dataLoader.loadMany(opts.value) : dataLoader.load(opts.value)
   }
@@ -309,23 +304,9 @@ export class ServiceLoader {
     return new Loader(this, { ...this.state, multi: true }) as this
   }
 
-  clear(value?: unknown): this {
-    const { loaders } = this.options
-    if (value === undefined) {
-      loaders.clear()
-      this.options.cacheParamsFn = createDefaultCacheParamsFn()
-    } else {
-      const values = Array.isArray(value) ? value : [value]
-      if (values.length === 0) {
-        return this
-      }
-      const key = this.state.key
-      for (const cachedLoader of loaders.values()) {
-        if (cachedLoader.key === key) {
-          values.forEach((value) => cachedLoader.dataLoader.clear(value))
-        }
-      }
-    }
+  clear(): this {
+    this.options.loaders.clear()
+    this.options.cacheParamsFn = createDefaultCacheParamsFn()
     return this
   }
 }
