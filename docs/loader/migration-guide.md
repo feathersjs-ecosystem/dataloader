@@ -38,11 +38,15 @@ loader.service('comments').key('postId').multi().load(postId, params)
 
 ## Removed configuration
 
-`maxBatchSize` is the only remaining loader setting. Remove `batch`, `batchScheduleFn`, `cache`, `cacheKeyFn`, `name`, `cacheMap`, and `cacheParamsFn` options, including per-call `cacheParamsFn` overrides. Params are handled automatically, including custom params, callbacks, and transactions.
+`key` and `maxBatchSize` are the supported loader settings. Remove `batch`, `batchScheduleFn`, `cache`, `cacheKeyFn`, `name`, `cacheMap`, and `cacheParamsFn` options, including per-call `cacheParamsFn` overrides. Params are handled automatically, including custom params, callbacks, and transactions.
 
 Remove custom loader-class options (`BaseLoader` or `ServiceLoader`) from `AppLoader`. For custom batch functions, use [DataLoader](./loader-utils.md) directly.
 
 The instance `stringifyKey()` helper and the `defaultCacheParamsFn`, `CacheParams`, `CacheParamsFn`, and `CacheMap` exports are removed.
+
+## exec()
+
+`exec()` is now private. Replace direct calls with `load()` or `_load()`, using `.key(key)` and `.multi()` as needed.
 
 ## Clearing
 

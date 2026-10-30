@@ -18,7 +18,6 @@ describe('appLoader.test', () => {
     assert.isFunction(serviceLoader._load)
     assert.isFunction(serviceLoader.key)
     assert.isFunction(serviceLoader.multi)
-    assert.isFunction(serviceLoader.exec)
     assert.isFunction(serviceLoader.clear)
   })
 
@@ -62,6 +61,35 @@ describe('appLoader.test', () => {
     const serviceLoader = appLoader.service('posts')
     assert.equal(serviceLoader.options.maxBatchSize, 10)
     assert.equal(appLoader.service('comments').options.maxBatchSize, 10)
+  })
+
+  it('uses the global key unless a service specifies its own key', async () => {
+    const appLoader = new AppLoader({
+      app: makeApp(),
+      key: 'userId',
+      services: {
+        posts: { key: undefined },
+        comments: { key: 'postId' }
+      }
+    })
+
+    const post = (await appLoader.service('posts').load(101)) as { id: number }
+    const comments = (await appLoader.service('comments').multi().load(1)) as { postId: number }[]
+    assert.equal(post.id, 1)
+    assert.lengthOf(comments, 3)
+    comments.forEach((comment) => assert.equal(comment.postId, 1))
+  })
+
+  it('defaults unconfigured services to their service ID field', async () => {
+    const appLoader = new AppLoader({
+      app: makeApp(),
+      services: { comments: { key: 'postId' } }
+    })
+
+    const post = (await appLoader.service('posts').load(1)) as { id: number }
+    const comments = (await appLoader.service('comments').multi().load(1)) as unknown[]
+    assert.equal(post.id, 1)
+    assert.lengthOf(comments, 3)
   })
 
   it('ignores removed global and service cacheParamsFn overrides', async () => {

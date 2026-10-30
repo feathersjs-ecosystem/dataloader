@@ -15,16 +15,17 @@ const loader = new AppLoader({
   app,
   maxBatchSize: 100,
   services: {
-    users: { maxBatchSize: 50 }
+    comments: { key: 'postId', maxBatchSize: 50 }
   }
 })
 ```
 
-| Option         | Default    | Description                                                       |
-| -------------- | ---------- | ----------------------------------------------------------------- |
-| `app`          | Required   | A Feathers application.                                           |
-| `services`     | `{}`       | Per-service `maxBatchSize` settings, overriding the global value. |
-| `maxBatchSize` | `Infinity` | Maximum number of keys per batch.                                 |
+| Option         | Default                       | Description                                                              |
+| -------------- | ----------------------------- | ------------------------------------------------------------------------ |
+| `app`          | Required                      | A Feathers application.                                                  |
+| `services`     | `{}`                          | Per-service `key` and `maxBatchSize` settings, overriding global values. |
+| `key`          | Service's ID field, or `'id'` | Default field to match when loading values.                              |
+| `maxBatchSize` | `Infinity`                    | Maximum number of keys per batch.                                        |
 
 ## service(serviceName)
 
@@ -53,7 +54,7 @@ Use `loader.service('users').clear()` to clear just one service.
 
 ## TypeScript
 
-`AppLoaderOptions` describes constructor options. `ServiceConfig` contains the optional `maxBatchSize` setting.
+`AppLoaderOptions` describes constructor options. `ServiceConfig` contains the optional `key` and `maxBatchSize` settings.
 
 ```ts
 import { AppLoader, type AppLoaderOptions } from 'feathers-dataloader'

@@ -17,6 +17,7 @@ export type LoadMethod = 'load' | '_load'
 export interface ServiceLoaderOptions {
   app: Pick<Application, 'service'>
   serviceName: string
+  key?: string
   maxBatchSize?: number
 }
 
@@ -26,7 +27,7 @@ interface LoaderState {
 }
 
 interface ExecOptions extends LoaderState {
-  id?: unknown
+  value?: unknown
   params?: Params
   method?: LoadMethod
 }
@@ -77,10 +78,10 @@ const createDataLoader = ({ service, key, maxBatchSize, multi, method, params }:
   }
   const getResults = multi ? uniqueResultsMulti : uniqueResults
   return new DataLoader<unknown, unknown>(
-    async (keys: readonly unknown[]) => {
-      const query = { ...params.query, [key]: { $in: uniqueKeys([...keys]) } }
+    async (values: readonly unknown[]) => {
+      const query = { ...params.query, [key]: { $in: uniqueKeys([...values]) } }
       const result = await methodFn.call(service, { ...params, paginate: false, query })
-      return getResults([...keys], result, key)
+      return getResults([...values], result, key)
     },
     { maxBatchSize, cacheKeyFn: defaultCacheKeyFn }
   )
@@ -239,12 +240,12 @@ export class ServiceLoader {
       return
     }
 
-    const { app, serviceName, maxBatchSize } = options
+    const { app, serviceName, key, maxBatchSize } = options
     const service = app.service(serviceName) as LoaderService
     this.options = {
       app,
       service,
-      key: (service.options && service.options.id) || 'id',
+      key: key ?? (service.options?.id || 'id'),
       cacheParamsFn: createDefaultCacheParamsFn(),
       maxBatchSize,
       loaders: new Map(),
@@ -252,12 +253,12 @@ export class ServiceLoader {
     }
   }
 
-  async exec(opts: ExecOptions = {}): Promise<unknown> {
+  private async exec(opts: ExecOptions = {}): Promise<unknown> {
     const { service, maxBatchSize, cacheParamsFn, cacheMap, loaders } = this.options
 
     const execOptions = _.assign(
       {
-        id: null as unknown,
+        value: null as unknown,
         key: this.options.key,
         params: {},
         multi: false,
@@ -270,8 +271,8 @@ export class ServiceLoader {
       throw new GeneralError(`Loader load methods cannot contain ${filters.join(', ')} in the query`)
     }
 
-    if (Array.isArray(execOptions.id)) {
-      execOptions.id = [...execOptions.id].sort()
+    if (Array.isArray(execOptions.value)) {
+      execOptions.value = [...execOptions.value].sort()
     }
 
     const cacheKey = stringifyKey(execOptions, cacheParamsFn)
@@ -298,9 +299,9 @@ export class ServiceLoader {
       loaders.set(loaderKey, dataLoader)
     }
 
-    const promise = Array.isArray(execOptions.id)
-      ? dataLoader.loadMany(execOptions.id)
-      : dataLoader.load(execOptions.id)
+    const promise = Array.isArray(execOptions.value)
+      ? dataLoader.loadMany(execOptions.value)
+      : dataLoader.load(execOptions.value)
 
     cacheMap.set(cacheKey, promise)
 
@@ -313,7 +314,7 @@ export class ServiceLoader {
     try {
       const result = await promise
       if (
-        Array.isArray(execOptions.id) &&
+        Array.isArray(execOptions.value) &&
         Array.isArray(result) &&
         result.some((item) => item instanceof Error)
       ) {
@@ -326,12 +327,12 @@ export class ServiceLoader {
     }
   }
 
-  load(id: unknown, params?: Params): Promise<unknown> {
-    return this.exec({ ...this.state, method: 'load', id, params })
+  load(value: unknown, params?: Params): Promise<unknown> {
+    return this.exec({ ...this.state, method: 'load', value, params })
   }
 
-  _load(id: unknown, params?: Params): Promise<unknown> {
-    return this.exec({ ...this.state, method: '_load', id, params })
+  _load(value: unknown, params?: Params): Promise<unknown> {
+    return this.exec({ ...this.state, method: '_load', value, params })
   }
 
   key(key: string): this {

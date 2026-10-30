@@ -4,9 +4,10 @@
 
 ### Breaking changes
 
-- Limit AppLoader and ServiceLoader configuration to `maxBatchSize`; remove other DataLoader options.
+- Make `exec()` private. Use `load()` or `_load()` with `.key()` and `.multi()` for lookups.
+- Limit AppLoader and ServiceLoader configuration to `key` and `maxBatchSize`; remove other DataLoader options.
 - Remove service-loader `get`, `_get`, `find`, and `_find` methods. Use `load`/`_load` for relationship lookups or call the Feathers service directly.
-- Make `multi()` take no arguments. Use `.key(field).multi()` to select a relationship field.
+- Make `multi()` take no arguments. Use `.key(key).multi()` to select a relationship field.
 - Remove custom `cacheMap`, `cacheParamsFn`, and AppLoader base-class configuration, and the old cache-params types/default function exports.
 - Normalize all params recursively for cache identity, preserving primitive distinctions and reference identity for callbacks and opaque objects.
 - Reject `$limit`, `$skip`, and `$sort` query filters in both load methods. `$limit` is no longer silently removed.
@@ -15,6 +16,7 @@
 
 ### Fixes and improvements
 
+- Add a default `key` setting globally, per service, or on direct ServiceLoader construction, falling back to the service's ID field.
 - Resolve matching TypeScript declarations for ESM and CommonJS consumers.
 - Declare Feathers v5 as a peer dependency so consumers can resolve the public types.
 - Keep derived `key()` and `multi()` handles independent while sharing service cache state.

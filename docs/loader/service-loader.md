@@ -20,13 +20,14 @@ const users = new ServiceLoader({
 
 ### Options
 
-| Option         | Default    | Description                       |
-| -------------- | ---------- | --------------------------------- |
-| `app`          | Required   | A Feathers application.           |
-| `serviceName`  | Required   | Name passed to `app.service()`.   |
-| `maxBatchSize` | `Infinity` | Maximum number of keys per batch. |
+| Option         | Default                       | Description                                 |
+| -------------- | ----------------------------- | ------------------------------------------- |
+| `app`          | Required                      | A Feathers application.                     |
+| `serviceName`  | Required                      | Name passed to `app.service()`.             |
+| `key`          | Service's ID field, or `'id'` | Default field to match when loading values. |
+| `maxBatchSize` | `Infinity`                    | Maximum number of keys per batch.           |
 
-## load(id, params = {})
+## load(value, params = {})
 
 Loads a record using the service's `find()` method with hooks. Compatible calls are batched into a `$in` query.
 
@@ -36,7 +37,7 @@ const people = await users.load([2, 1, 2, 999], params)
 // [user1, user2, user2, null] when 999 is missing
 ```
 
-The matching key defaults to `service.options.id`, or `'id'`. Array keys use JavaScript's default `.sort()` order (string comparison), with duplicates preserved. The input array is not mutated. A missing match returns `null`.
+The matching field uses the configured `key`, falling back to `service.options.id` and then `'id'`. Array values use JavaScript's default `.sort()` order (string comparison), with duplicates preserved. The input array is not mutated. A missing match returns `null`.
 
 ### Params and queries
 
@@ -57,7 +58,7 @@ for (const result of results) {
 }
 ```
 
-## \_load(id, params = {})
+## \_load(value, params = {})
 
 Works like `load()`, but calls `_find()` without service hooks. The service must implement `_find()`.
 
@@ -65,9 +66,9 @@ Works like `load()`, but calls `_find()` without service hooks. The service must
 const user = await users._load(1, params)
 ```
 
-## key(field)
+## key(key)
 
-Returns a loader for a different matching field without changing the original loader. Dot notation is supported when the adapter can query the nested field.
+Overrides the default matching field for a loader without changing the original loader. Dot notation is supported when the adapter can query the nested field.
 
 ```js
 const user = await users.key('email').load('reader@example.com', params)
@@ -84,7 +85,7 @@ const comments = await byPost.load(1, params) // Record[] or null
 const groups = await byPost.load([2, 1], params) // Groups for post 1, then post 2
 ```
 
-`multi().key('postId')` also works. Without `key()`, the service's default ID field is used. Missing groups return `null`.
+`multi().key('postId')` also works. Without `key()`, the loader's default matching field is used. Missing groups return `null`.
 
 ## clear()
 
@@ -93,20 +94,6 @@ Clears cached results for this service, including loaders created with `key()` a
 ```js
 users.clear()
 ```
-
-## exec(options)
-
-Runs a lookup using explicit options. `load()` and `_load()` use this method internally.
-
-| Option   | Default            | Description                                       |
-| -------- | ------------------ | ------------------------------------------------- |
-| `id`     | `null`             | Key or array of keys to load. Supply a valid key. |
-| `key`    | Service's ID field | Matching field.                                   |
-| `multi`  | `false`            | Return all matching records per key.              |
-| `method` | `'load'`           | `'load'` or `'_load'`.                            |
-| `params` | `{}`               | Service params.                                   |
-
-These defaults apply independently of any `key()` or `multi()` chaining.
 
 ## TypeScript
 

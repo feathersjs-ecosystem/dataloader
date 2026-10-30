@@ -35,7 +35,6 @@ describe('serviceLoader.test', () => {
     assert.isFunction(serviceLoader._load)
     assert.isFunction(serviceLoader.key)
     assert.isFunction(serviceLoader.multi)
-    assert.isFunction(serviceLoader.exec)
     assert.isFunction(serviceLoader.clear)
     for (const method of ['get', '_get', 'find', '_find']) {
       assert.notProperty(serviceLoader, method)
@@ -263,9 +262,9 @@ describe('serviceLoader.test', () => {
 
       const results = await Promise.all([
         // @ts-expect-error Per-call cache overrides are no longer supported.
-        configured.exec({ id: 1, params: { tenant: 1 }, cacheParamsFn: override }),
+        configured.load(1, { tenant: 1 }, override),
         // @ts-expect-error Per-call cache overrides are no longer supported.
-        configured.exec({ id: 1, params: { tenant: 2 }, cacheParamsFn: override })
+        configured.load(1, { tenant: 2 }, override)
       ])
 
       assert.deepEqual(results, [
@@ -316,6 +315,50 @@ describe('serviceLoader.test', () => {
     const defaultResult = await app.service('posts').get(1)
     const result = await serviceLoader.load(1)
     assert.deepEqual(result, defaultResult)
+  })
+
+  it('uses service.options.id as the default matching field', async () => {
+    const record = { uuid: 'user-1' }
+    const queries: unknown[] = []
+    const loader = new ServiceLoader({
+      app: mockApp({
+        options: { id: 'uuid' },
+        find: async (params: Params) => {
+          queries.push(params.query)
+          return [record]
+        }
+      }),
+      serviceName: 'users'
+    })
+
+    assert.deepEqual(await loader.load('user-1'), record)
+    assert.deepEqual(queries, [{ uuid: { $in: ['user-1'] } }])
+  })
+
+  it('uses the configured key by default and lets chained loaders override it', async () => {
+    const record = { uuid: 'user-1', email: 'reader@example.com', profile: { externalId: 'external-1' } }
+    const queries: unknown[] = []
+    const find = async (params: Params) => {
+      queries.push(params.query)
+      return [record]
+    }
+    const loader = new ServiceLoader({
+      app: mockApp({ options: { id: 'uuid' }, find, _find: find }),
+      serviceName: 'users',
+      key: 'profile.externalId'
+    })
+
+    assert.deepEqual(await loader.load('external-1'), record)
+    assert.deepEqual(await loader.key('email').load('reader@example.com'), record)
+    assert.deepEqual(await loader.multi().load('external-1'), [record])
+    assert.deepEqual(await loader.key('uuid')._load('user-1'), record)
+    assert.deepEqual(await loader.load('external-1'), record)
+    assert.deepEqual(queries, [
+      { 'profile.externalId': { $in: ['external-1'] } },
+      { email: { $in: ['reader@example.com'] } },
+      { 'profile.externalId': { $in: ['external-1'] } },
+      { uuid: { $in: ['user-1'] } }
+    ])
   })
 
   it('works with load([id1, id2])', async () => {
@@ -717,6 +760,20 @@ describe('serviceLoader.test', () => {
       assert.deepEqual(await regrouped.load('a'), records.slice(0, 2))
       assert.deepEqual(await keyed.load('second'), records[1])
       assert.deepEqual(await loader.load(3), records[2])
+    })
+
+    it('reuses key and value lookups across equivalent chained loaders', async () => {
+      const single = await loader.key('label').load('first')
+      assert.deepEqual(single, records[0])
+      assert.strictEqual(await loader.key('label').load('first'), single)
+
+      const groups = await loader.key('group').multi()._load(['b', 'a'])
+      assert.deepEqual(groups, [records.slice(0, 2), [records[2]]])
+      assert.strictEqual(await loader.multi().key('group')._load(['a', 'b']), groups)
+      assert.deepEqual(
+        calls.map((params) => params.query),
+        [{ label: { $in: ['first'] } }, { group: { $in: ['a', 'b'] } }]
+      )
     })
 
     it('uses the default service key when multi is called without key()', async () => {
