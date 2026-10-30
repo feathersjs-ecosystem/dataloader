@@ -14,6 +14,32 @@ describe('utils.test', () => {
     expect(newKeys).toEqual([1, 2])
   })
 
+  it('uniqueKeys handles prototype names and preserves string-based comparisons', () => {
+    const keys = ['constructor', 1, '1', '__proto__', 'constructor', 'toString', 1]
+    expect(uniqueKeys(keys)).toEqual(['constructor', 1, '__proto__', 'toString'])
+  })
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    'uniqueResults maps %s without inherited entries',
+    (key) => {
+      const record = { id: key }
+      expect(uniqueResults([key], [])).toEqual([null])
+      expect(uniqueResults([key, 'missing', key], [record])).toEqual([record, null, record])
+    }
+  )
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    'uniqueResultsMulti groups %s without inherited entries',
+    (key) => {
+      const records = [
+        { id: key, value: 1 },
+        { id: key, value: 2 }
+      ]
+      expect(uniqueResultsMulti([key], [])).toEqual([null])
+      expect(uniqueResultsMulti([key, 'missing', key], records)).toEqual([records, null, records])
+    }
+  )
+
   it('uniqueResults returns proper number of results', () => {
     const keys = [1, 2]
     const results = [{ id: 1 }, { id: 2 }, { id: 3 }]
@@ -120,6 +146,11 @@ describe('utils.test', () => {
   it('stableStringify throws with a function param', () => {
     const fn = () => stableStringify({ func: () => {} })
     expect(fn).toThrow()
+  })
+
+  it('stableStringify preserves an own __proto__ property', () => {
+    const value = JSON.parse('{"z":2,"__proto__":{"value":1},"a":3}')
+    expect(stableStringify(value)).toBe('{"__proto__":{"value":1},"a":3,"z":2}')
   })
 
   it('defaultCacheKeyFn coerces things to string', () => {

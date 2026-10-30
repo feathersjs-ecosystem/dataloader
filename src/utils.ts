@@ -83,12 +83,7 @@ export const stableStringify = (object: unknown): string => {
 
     if (_.isObject(value)) {
       const keys = Object.keys(value).sort()
-      const result: Record<string, unknown> = {}
-      for (let index = 0, length = keys.length; index < length; ++index) {
-        const key = keys[index]!
-        result[key] = value[key]
-      }
-      return result
+      return Object.fromEntries(keys.map((key) => [key, value[key]]))
     }
 
     return value
@@ -110,18 +105,17 @@ export const defaultCacheKeyFn = (id: unknown): unknown => {
  * Remove duplicate keys from an array while preserving order.
  */
 export const uniqueKeys = <T>(keys: T[]): T[] => {
-  const found: Record<string, number> = {}
-  const unique: T[] = []
+  const found = new Map<string, T>()
 
   for (let index = 0, length = keys.length; index < length; ++index) {
     const key = keys[index]!
     const keyStr = String(key)
-    if (!found[keyStr]) {
-      found[keyStr] = unique.push(key)
+    if (!found.has(keyStr)) {
+      found.set(keyStr, key)
     }
   }
 
-  return unique
+  return [...found.values()]
 }
 
 /** Object with indexable properties for result mapping */
@@ -134,7 +128,7 @@ export type ServiceResult<T> = T[] | { data: T[] }
 
 /**
  * Map service results back to requested keys in order.
- * Returns one result per key (first match).
+ * Returns one result per key.
  */
 export const uniqueResults = <T extends ResultWithId, K>(
   keys: K[],
@@ -143,17 +137,17 @@ export const uniqueResults = <T extends ResultWithId, K>(
   defaultValue: T | null = null
 ): (T | null)[] => {
   const serviceResults = 'data' in result ? result.data : result
-  const found: Record<string, T> = {}
+  const found = new Map<string, T>()
   const results: (T | null)[] = []
 
   for (let index = 0, length = serviceResults.length; index < length; ++index) {
     const item = serviceResults[index]!
     const id = String(getByDotPath(item, key))
-    found[id] = item
+    found.set(id, item)
   }
 
   for (let index = 0, length = keys.length; index < length; ++index) {
-    results.push(found[String(keys[index])] || defaultValue)
+    results.push(found.get(String(keys[index])) ?? defaultValue)
   }
 
   return results
@@ -170,21 +164,22 @@ export const uniqueResultsMulti = <T extends ResultWithId, K>(
   defaultValue: T[] | null = null
 ): (T[] | null)[] => {
   const serviceResults = 'data' in result ? result.data : result
-  const found: Record<string, T[]> = {}
+  const found = new Map<string, T[]>()
   const results: (T[] | null)[] = []
 
   for (let index = 0, length = serviceResults.length; index < length; ++index) {
     const item = serviceResults[index]!
     const id = String(getByDotPath(item, key))
-    if (found[id]) {
-      found[id].push(item)
+    const group = found.get(id)
+    if (group) {
+      group.push(item)
     } else {
-      found[id] = [item]
+      found.set(id, [item])
     }
   }
 
   for (let index = 0, length = keys.length; index < length; ++index) {
-    results.push(found[String(keys[index])] || defaultValue)
+    results.push(found.get(String(keys[index])) ?? defaultValue)
   }
 
   return results
