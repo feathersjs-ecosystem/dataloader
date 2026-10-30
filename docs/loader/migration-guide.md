@@ -6,6 +6,10 @@ outline: deep
 
 These changes describe the upcoming V1 API compared with 0.2.x.
 
+## Feathers dependency
+
+The package now declares `@feathersjs/feathers@^5.0.31` as a peer dependency. Keep a compatible version installed in your application.
+
 ## Service methods
 
 Service loaders no longer expose `get()`, `_get()`, `find()`, or `_find()`. Use `load()` and `_load()` for relationship lookups, or call the Feathers service directly.
